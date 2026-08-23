@@ -13,6 +13,15 @@ const where = <T>(items: readonly T[], code: string, change: (item: T) => T) =>
   });
 const invalid = (catalog: ResourceCatalog): void =>
   expect(() => parseResourceCatalogSemantics(catalog)).toThrow(ResourceCatalogValidationError);
+const issues = (catalog: ResourceCatalog): readonly string[] => {
+  try {
+    parseResourceCatalogSemantics(catalog);
+  } catch (error) {
+    expect(error).toBeInstanceOf(ResourceCatalogValidationError);
+    return (error as ResourceCatalogValidationError).issues;
+  }
+  throw new Error("expected catalog validation to fail");
+};
 
 describe("resource catalog semantic validation", () => {
   it("preserves Cable references, ownership, applicability and presentation", () => {
@@ -101,5 +110,34 @@ describe("resource catalog semantic validation", () => {
       },
     ];
     for (const catalog of cases) invalid(catalog);
+  });
+
+  it("rejects impossible defaults and sorts deterministic issue content", () => {
+    const color = cableCatalog.bindings.find((item) => item.attributeCode === "color");
+    const set = cableCatalog.optionSets[0];
+    if (!color || !set) throw new Error("complete fixture expected");
+    invalid({
+      ...cableCatalog,
+      bindings: where(cableCatalog.bindings, "color", (item) => ({
+        ...item,
+        defaultResult: { mode: "NOT_APPLICABLE" as const, identity: true },
+      })),
+    });
+    const malformed = (optionSets: readonly (typeof set)[]) => ({
+      ...cableCatalog,
+      family: { ...cableCatalog.family, classCode: "MISSING" },
+      optionSets,
+    });
+    const expected = [
+      "duplicate option-set code CONDUCTOR_MATERIAL",
+      "duplicate option-set ownership conductor_material",
+      "family class reference is dangling",
+    ];
+    expect(issues(malformed([set, set, ...cableCatalog.optionSets.slice(1)])).slice()).toEqual(
+      expected,
+    );
+    expect(issues(malformed([...cableCatalog.optionSets.slice(1), set, set])).slice()).toEqual(
+      expected,
+    );
   });
 });
