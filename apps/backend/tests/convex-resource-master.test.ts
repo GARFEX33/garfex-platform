@@ -83,4 +83,65 @@ describe("Convex Resource Master adapter", () => {
       value: { items: [expect.objectContaining({ resourceId: created.value.resourceId })] },
     });
   });
+
+  it("atomically updates and deactivates persisted resources with revision guards", async () => {
+    const t = convexTest(schema, modules);
+    const created = await t.mutation(api.resourceMaster.createResource, valid);
+    if (!created.ok) throw new Error("expected create success");
+
+    expect(
+      await t.mutation(api.resourceMaster.updateNonIdentityData, {
+        resourceId: created.value.resourceId,
+        expectedRevision: 0,
+        naturalUnitCode: "M",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "CONFLICT", currentRevision: 1 } });
+    const updated = await t.mutation(api.resourceMaster.updateNonIdentityData, {
+      resourceId: created.value.resourceId,
+      expectedRevision: 1,
+      naturalUnitCode: "ROLLO",
+    });
+    expect(updated).toMatchObject({
+      ok: true,
+      value: { naturalUnitCode: "ROLLO", revision: 2, active: true },
+    });
+    const deactivated = await t.mutation(api.resourceMaster.deactivateResource, {
+      resourceId: created.value.resourceId,
+      expectedRevision: 2,
+    });
+    expect(deactivated).toMatchObject({ ok: true, value: { active: false, revision: 3 } });
+
+    const persisted = await t.run(async (ctx) => {
+      const header = await ctx.db
+        .query("resources")
+        .withIndex("by_resource_id", (query) => query.eq("resourceId", created.value.resourceId))
+        .unique();
+      const attributes = await ctx.db
+        .query("resourceAttributes")
+        .withIndex("by_resource_code", (query) => query.eq("resourceId", created.value.resourceId))
+        .collect();
+      return { header, attributes };
+    });
+    expect(persisted.header).toMatchObject({
+      resourceId: created.value.resourceId,
+      canonicalIdentity: created.value.canonicalIdentity,
+      naturalUnitCode: "ROLLO",
+      active: false,
+      revision: 3,
+    });
+    expect(persisted.attributes).toHaveLength(created.value.attributes.length);
+    expect(
+      await t.query(api.resourceMaster.getResource, { resourceId: created.value.resourceId }),
+    ).toEqual(deactivated);
+    expect(
+      await t.query(api.resourceMaster.searchResources, {
+        terms: "cab",
+        lifecycle: "INACTIVE",
+        limit: 10,
+      }),
+    ).toMatchObject({
+      ok: true,
+      value: { items: [expect.objectContaining({ resourceId: created.value.resourceId })] },
+    });
+  });
 });

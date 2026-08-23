@@ -201,4 +201,152 @@ describe("Resource Master application", () => {
       error: { code: "INVALID_ARGUMENT" },
     });
   });
+
+  it("updates only NaturalUnit while preserving identity and enforcing optimistic revision", async () => {
+    const { master } = setup();
+    const created = await master.createResource(valid);
+    if (!created.ok) throw new Error("expected create success");
+
+    const updated = await master.updateNonIdentityData({
+      resourceId: created.value.resourceId,
+      expectedRevision: 1,
+      naturalUnitCode: " rollo ",
+    });
+    expect(updated).toMatchObject({
+      ok: true,
+      value: {
+        resourceId: created.value.resourceId,
+        naturalUnitCode: "ROLLO",
+        canonicalIdentity: created.value.canonicalIdentity,
+        identityPolicyVersion: "v1",
+        attributes: created.value.attributes,
+        revision: 2,
+        active: true,
+      },
+    });
+
+    expect(
+      await master.updateNonIdentityData({
+        resourceId: created.value.resourceId,
+        expectedRevision: 2,
+        naturalUnitCode: "CM",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_REFERENCE" } });
+    expect(await master.getResource({ resourceId: created.value.resourceId })).toMatchObject({
+      ok: true,
+      value: { naturalUnitCode: "ROLLO", revision: 2 },
+    });
+  });
+
+  it("checks revision before update no-op evaluation", async () => {
+    const { master } = setup();
+    const created = await master.createResource(valid);
+    if (!created.ok) throw new Error("expected create success");
+
+    expect(
+      await master.updateNonIdentityData({
+        resourceId: created.value.resourceId,
+        expectedRevision: 1,
+        naturalUnitCode: "M",
+      }),
+    ).toEqual(created);
+    expect(
+      await master.updateNonIdentityData({
+        resourceId: created.value.resourceId,
+        expectedRevision: 0,
+        naturalUnitCode: "ROLLO",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "CONFLICT", currentRevision: 1 } });
+    expect(
+      await master.updateNonIdentityData({
+        resourceId: created.value.resourceId,
+        expectedRevision: 0,
+        naturalUnitCode: "M",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "CONFLICT", currentRevision: 1 } });
+  });
+
+  it("deactivates once and keeps inactive resources historically readable", async () => {
+    const { master } = setup();
+    const created = await master.createResource(valid);
+    if (!created.ok) throw new Error("expected create success");
+
+    expect(
+      await master.deactivateResource({
+        resourceId: created.value.resourceId,
+        expectedRevision: 0,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "CONFLICT", currentRevision: 1 } });
+    const deactivated = await master.deactivateResource({
+      resourceId: created.value.resourceId,
+      expectedRevision: 1,
+    });
+    expect(deactivated).toMatchObject({
+      ok: true,
+      value: {
+        resourceId: created.value.resourceId,
+        canonicalIdentity: created.value.canonicalIdentity,
+        attributes: created.value.attributes,
+        active: false,
+        revision: 2,
+      },
+    });
+    expect(await master.getResource({ resourceId: created.value.resourceId })).toEqual(deactivated);
+    expect(await master.describeResource({ resourceId: created.value.resourceId })).toMatchObject({
+      ok: true,
+      value: { description: expect.stringContaining("THW") },
+    });
+    expect(
+      await master.deactivateResource({
+        resourceId: created.value.resourceId,
+        expectedRevision: 2,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_LIFECYCLE" } });
+  });
+
+  it("filters search by lifecycle and keeps order/cursors stable within each set", async () => {
+    const { master } = setup();
+    const first = await master.createResource(valid);
+    const second = await master.createResource({
+      ...valid,
+      attributes: { ...valid.attributes, color: "NEGRO" },
+    });
+    const third = await master.createResource({
+      ...valid,
+      attributes: { ...valid.attributes, color: "BLANCO" },
+    });
+    if (!first.ok || !second.ok || !third.ok) throw new Error("expected create success");
+    await master.deactivateResource({ resourceId: second.value.resourceId, expectedRevision: 1 });
+
+    const activeDefault = await master.searchResources({ terms: "cab", limit: 10 });
+    expect(activeDefault.ok && activeDefault.value.items.map((item) => item.resourceId)).toEqual([
+      first.value.resourceId,
+      third.value.resourceId,
+    ]);
+    const inactive = await master.searchResources({
+      terms: "cab",
+      lifecycle: "INACTIVE",
+      limit: 10,
+    });
+    expect(inactive.ok && inactive.value.items.map((item) => item.resourceId)).toEqual([
+      second.value.resourceId,
+    ]);
+
+    const allIds: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const page = await master.searchResources({
+        terms: "cab",
+        lifecycle: "ALL",
+        limit: 1,
+        cursor,
+      });
+      if (!page.ok) throw new Error("expected search success");
+      allIds.push(...page.value.items.map((item) => item.resourceId));
+      cursor = page.value.cursor;
+    } while (cursor !== null);
+    expect(allIds).toEqual(
+      [first.value.resourceId, second.value.resourceId, third.value.resourceId].sort(),
+    );
+  });
 });

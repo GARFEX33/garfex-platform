@@ -13,14 +13,54 @@ export class InMemoryResourceRepository implements ResourceRepository {
     return { kind: "CREATED" as const };
   }
 
+  async updateNaturalUnit({
+    resourceId,
+    expectedRevision,
+    naturalUnitCode,
+    searchProjection,
+  }: Parameters<ResourceRepository["updateNaturalUnit"]>[0]) {
+    const current = this.#byId.get(resourceId);
+    if (current === undefined) return { kind: "NOT_FOUND" as const };
+    if (current.revision !== expectedRevision) {
+      return { kind: "CONFLICT" as const, currentRevision: current.revision };
+    }
+    if (!current.active) return { kind: "INVALID_LIFECYCLE" as const };
+    if (current.naturalUnitCode === naturalUnitCode) {
+      return { kind: "UPDATED" as const, resource: structuredClone(current) };
+    }
+    const next = {
+      ...current,
+      naturalUnitCode,
+      revision: current.revision + 1,
+    };
+    const updated = { ...next, searchProjection: searchProjection(next) };
+    this.#byId.set(resourceId, updated);
+    return { kind: "UPDATED" as const, resource: structuredClone(updated) };
+  }
+
+  async deactivate({
+    resourceId,
+    expectedRevision,
+  }: Parameters<ResourceRepository["deactivate"]>[0]) {
+    const current = this.#byId.get(resourceId);
+    if (current === undefined) return { kind: "NOT_FOUND" as const };
+    if (current.revision !== expectedRevision) {
+      return { kind: "CONFLICT" as const, currentRevision: current.revision };
+    }
+    if (!current.active) return { kind: "INVALID_LIFECYCLE" as const };
+    const updated = { ...current, active: false, revision: current.revision + 1 };
+    this.#byId.set(resourceId, updated);
+    return { kind: "UPDATED" as const, resource: structuredClone(updated) };
+  }
+
   async getByResourceId(resourceId: string) {
     const resource = this.#byId.get(resourceId);
     return resource === undefined ? null : structuredClone(resource);
   }
 
-  async listActivePage({ offset, limit }: { readonly offset: number; readonly limit: number }) {
+  async listPage({ lifecycle, offset, limit }: Parameters<ResourceRepository["listPage"]>[0]) {
     const resources = [...this.#byId.values()]
-      .filter((resource) => resource.active)
+      .filter((resource) => lifecycle === "ALL" || resource.active === (lifecycle === "ACTIVE"))
       .sort((left, right) => left.resourceId.localeCompare(right.resourceId));
     return {
       resources: structuredClone(resources.slice(offset, offset + limit)),
