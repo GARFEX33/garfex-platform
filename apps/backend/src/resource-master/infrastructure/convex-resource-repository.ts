@@ -142,25 +142,35 @@ export class ConvexResourceRepository implements ResourceRepository {
     return header === null ? null : reconstruct(this.db, header);
   }
 
-  async listPage({ lifecycle, offset, limit }: Parameters<ResourceRepository["listPage"]>[0]) {
+  async listPage({
+    lifecycle,
+    afterResourceId,
+    limit,
+  }: Parameters<ResourceRepository["listPage"]>[0]) {
     const headers =
       lifecycle === "ALL"
         ? await this.db
             .query("resources")
-            .withIndex("by_resource_id")
-            .order("asc")
-            .take(offset + limit + 1)
-        : await this.db
-            .query("resources")
-            .withIndex("by_active_resource_id", (query) =>
-              query.eq("active", lifecycle === "ACTIVE"),
+            .withIndex("by_resource_id", (query) =>
+              afterResourceId === undefined ? query : query.gt("resourceId", afterResourceId),
             )
             .order("asc")
-            .take(offset + limit + 1);
-    const selected = headers.slice(offset, offset + limit);
+            .take(limit + 1)
+        : await this.db
+            .query("resources")
+            .withIndex("by_active_resource_id", (query) => {
+              const lifecycleRange = query.eq("active", lifecycle === "ACTIVE");
+              return afterResourceId === undefined
+                ? lifecycleRange
+                : lifecycleRange.gt("resourceId", afterResourceId);
+            })
+            .order("asc")
+            .take(limit + 1);
+    const selected = headers.slice(0, limit);
     return {
       resources: await Promise.all(selected.map((header) => reconstruct(this.db, header))),
-      hasMore: headers.length > offset + limit,
+      lastScannedResourceId: selected.at(-1)?.resourceId ?? null,
+      hasMore: headers.length > limit,
     };
   }
 }

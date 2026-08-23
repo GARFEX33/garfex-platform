@@ -25,10 +25,11 @@ export interface ResourceRepository {
   getByResourceId(resourceId: string): Promise<PersistedResource | null>;
   listPage(input: {
     readonly lifecycle: "ACTIVE" | "INACTIVE" | "ALL";
-    readonly offset: number;
+    readonly afterResourceId?: string;
     readonly limit: number;
   }): Promise<{
     readonly resources: readonly PersistedResource[];
+    readonly lastScannedResourceId: string | null;
     readonly hasMore: boolean;
   }>;
 }

@@ -86,6 +86,20 @@ describe("Convex Resource Master adapter", () => {
 
   it("atomically updates and deactivates persisted resources with revision guards", async () => {
     const t = convexTest(schema, modules);
+    expect(
+      await t.mutation(api.resourceMaster.updateNonIdentityData, {
+        resourceId: "missing",
+        expectedRevision: 1,
+        naturalUnitCode: "M",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+    expect(
+      await t.mutation(api.resourceMaster.deactivateResource, {
+        resourceId: "missing",
+        expectedRevision: 1,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+
     const created = await t.mutation(api.resourceMaster.createResource, valid);
     if (!created.ok) throw new Error("expected create success");
 
@@ -110,6 +124,13 @@ describe("Convex Resource Master adapter", () => {
       expectedRevision: 2,
     });
     expect(deactivated).toMatchObject({ ok: true, value: { active: false, revision: 3 } });
+    expect(
+      await t.mutation(api.resourceMaster.updateNonIdentityData, {
+        resourceId: created.value.resourceId,
+        expectedRevision: 3,
+        naturalUnitCode: "M",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_LIFECYCLE" } });
 
     const persisted = await t.run(async (ctx) => {
       const header = await ctx.db
@@ -143,5 +164,64 @@ describe("Convex Resource Master adapter", () => {
       ok: true,
       value: { items: [expect.objectContaining({ resourceId: created.value.resourceId })] },
     });
+  });
+
+  it("uses query-bound keyset cursors and continues across repository batches", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      for (let index = 1; index <= 205; index += 1) {
+        const ordinal = String(index).padStart(3, "0");
+        await ctx.db.insert("resources", {
+          resourceId: `resource-${ordinal}`,
+          classCode: "MATERIAL",
+          familyCode: "CONDUCTORES",
+          typeCode: "CABLE",
+          naturalUnitCode: "M",
+          canonicalIdentity: `identity-${ordinal}`,
+          identityPolicyVersion: "v1",
+          active: true,
+          revision: 1,
+          searchProjection: index === 205 ? "resource cab cobre" : "resource",
+        });
+      }
+    });
+
+    expect(
+      await t.query(api.resourceMaster.searchResources, { terms: "cab cobre", limit: 1 }),
+    ).toMatchObject({
+      ok: true,
+      value: { items: [expect.objectContaining({ resourceId: "resource-205" })], cursor: null },
+    });
+
+    const first = await t.query(api.resourceMaster.searchResources, {
+      terms: "resource",
+      lifecycle: "ACTIVE",
+      limit: 1,
+    });
+    if (!first.ok || first.value.cursor === null) throw new Error("expected a cursor");
+    expect(
+      await t.query(api.resourceMaster.searchResources, {
+        terms: "RESOURCE",
+        lifecycle: "ACTIVE",
+        limit: 1,
+        cursor: first.value.cursor,
+      }),
+    ).toMatchObject({ ok: true });
+    expect(
+      await t.query(api.resourceMaster.searchResources, {
+        terms: "resource",
+        lifecycle: "ALL",
+        limit: 1,
+        cursor: first.value.cursor,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_ARGUMENT" } });
+    expect(
+      await t.query(api.resourceMaster.searchResources, {
+        terms: "different",
+        lifecycle: "ACTIVE",
+        limit: 1,
+        cursor: first.value.cursor,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_ARGUMENT" } });
   });
 });

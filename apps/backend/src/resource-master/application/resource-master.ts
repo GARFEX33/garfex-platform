@@ -171,12 +171,41 @@ const searchProjectionFor = (catalog: ResourceCatalog, resource: PersistedResour
   );
 };
 
-const decodeCursor = (cursor: string | null | undefined): number | null => {
-  if (cursor === undefined || cursor === null) return 0;
-  const match = /^v1:(\d+)$/.exec(cursor);
-  if (match?.[1] === undefined) return null;
-  const offset = Number(match[1]);
-  return Number.isSafeInteger(offset) && offset >= 0 && offset <= 1_000 ? offset : null;
+type Lifecycle = Parameters<ResourceRepository["listPage"]>[0]["lifecycle"];
+
+const encodeCursor = (
+  lifecycle: Lifecycle,
+  normalizedTerms: string,
+  lastScannedResourceId: string,
+): string =>
+  `v2|${lifecycle}|${encodeURIComponent(normalizedTerms)}|${encodeURIComponent(lastScannedResourceId)}`;
+
+const decodeCursor = (
+  cursor: string | null | undefined,
+  lifecycle: Lifecycle,
+  normalizedTerms: string,
+): { readonly afterResourceId?: string } | null => {
+  if (cursor === undefined || cursor === null) return {};
+  const parts = cursor.split("|");
+  if (parts.length !== 4 || parts[0] !== "v2" || parts[1] !== lifecycle) return null;
+  const encodedTerms = parts[2];
+  const encodedResourceId = parts[3];
+  if (encodedTerms === undefined || encodedResourceId === undefined) return null;
+  try {
+    const decodedTerms = decodeURIComponent(encodedTerms);
+    const afterResourceId = decodeURIComponent(encodedResourceId);
+    if (
+      encodeURIComponent(decodedTerms) !== encodedTerms ||
+      encodeURIComponent(afterResourceId) !== encodedResourceId ||
+      decodedTerms !== normalizedTerms ||
+      afterResourceId.length === 0
+    ) {
+      return null;
+    }
+    return { afterResourceId };
+  } catch {
+    return null;
+  }
 };
 
 export const createResourceMaster = ({
@@ -495,28 +524,49 @@ export const createResourceMaster = ({
       if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
         return failure("INVALID_ARGUMENT", "limit must be an integer from 1 to 50");
       }
-      if (typeof terms !== "string" || normalizeSearchText(terms).length === 0) {
+      const normalizedTerms = typeof terms === "string" ? normalizeSearchText(terms) : "";
+      if (normalizedTerms.length === 0) {
         return failure("INVALID_ARGUMENT", "at least one search term is required");
       }
       if (!(["ACTIVE", "INACTIVE", "ALL"] as const).includes(lifecycle)) {
         return failure("INVALID_ARGUMENT", "invalid lifecycle filter");
       }
-      const offset = decodeCursor(cursor);
-      if (offset === null) return failure("INVALID_ARGUMENT", "invalid cursor");
-      const tokens = normalizeSearchText(terms).split(" ");
-      const page = await repository.listPage({ lifecycle, offset, limit: 200 });
-      const matches = page.resources.filter((resource) =>
-        tokens.every((token) =>
-          resource.searchProjection.split(" ").some((candidate) => candidate.startsWith(token)),
-        ),
-      );
-      const items = matches.slice(0, limit).map((resource) => summary(catalog, resource));
-      const consumed =
-        matches.length > limit
-          ? page.resources.indexOf(matches[limit] as PersistedResource)
-          : page.resources.length;
-      const hasMore = matches.length > limit || page.hasMore;
-      return success({ items, cursor: hasMore ? `v1:${offset + consumed}` : null });
+      const position = decodeCursor(cursor, lifecycle, normalizedTerms);
+      if (position === null) return failure("INVALID_ARGUMENT", "invalid cursor");
+      const tokens = normalizedTerms.split(" ");
+      const items: ResourceSummary[] = [];
+      let afterResourceId = position.afterResourceId;
+
+      while (items.length < limit) {
+        const page = await repository.listPage({
+          lifecycle,
+          ...(afterResourceId === undefined ? {} : { afterResourceId }),
+          limit: 200,
+        });
+        for (const [index, resource] of page.resources.entries()) {
+          afterResourceId = resource.resourceId;
+          const matches = tokens.every((token) =>
+            resource.searchProjection.split(" ").some((candidate) => candidate.startsWith(token)),
+          );
+          if (matches) items.push(summary(catalog, resource));
+          if (items.length === limit) {
+            const hasMore = index + 1 < page.resources.length || page.hasMore;
+            return success({
+              items,
+              cursor: hasMore
+                ? encodeCursor(lifecycle, normalizedTerms, resource.resourceId)
+                : null,
+            });
+          }
+        }
+        if (!page.hasMore) return success({ items, cursor: null });
+        if (page.lastScannedResourceId === null) {
+          return failure("INTERNAL", "resource repository returned an invalid page");
+        }
+        afterResourceId = page.lastScannedResourceId;
+      }
+
+      return success({ items, cursor: null });
     },
 
     async describeResource({ resourceId }) {

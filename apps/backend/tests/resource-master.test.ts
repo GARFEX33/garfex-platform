@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createResourceMaster } from "../src/resource-master/application/resource-master.js";
 import { cableCatalog } from "../src/resource-master/infrastructure/cable-catalog.js";
 import { InMemoryResourceRepository } from "../src/resource-master/infrastructure/in-memory-resource-repository.js";
+import type { PersistedResource } from "../src/resource-master/domain/types.js";
 
 const valid = {
   classCode: "MATERIAL",
@@ -266,6 +267,32 @@ describe("Resource Master application", () => {
     ).toMatchObject({ ok: false, error: { code: "CONFLICT", currentRevision: 1 } });
   });
 
+  it("reports missing update/deactivate targets and rejects updates to inactive resources", async () => {
+    const { master } = setup();
+
+    expect(
+      await master.updateNonIdentityData({
+        resourceId: "missing",
+        expectedRevision: 1,
+        naturalUnitCode: "M",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+    expect(
+      await master.deactivateResource({ resourceId: "missing", expectedRevision: 1 }),
+    ).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } });
+
+    const created = await master.createResource(valid);
+    if (!created.ok) throw new Error("expected create success");
+    await master.deactivateResource({ resourceId: created.value.resourceId, expectedRevision: 1 });
+    expect(
+      await master.updateNonIdentityData({
+        resourceId: created.value.resourceId,
+        expectedRevision: 2,
+        naturalUnitCode: "ROLLO",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_LIFECYCLE" } });
+  });
+
   it("deactivates once and keeps inactive resources historically readable", async () => {
     const { master } = setup();
     const created = await master.createResource(valid);
@@ -348,5 +375,68 @@ describe("Resource Master application", () => {
     expect(allIds).toEqual(
       [first.value.resourceId, second.value.resourceId, third.value.resourceId].sort(),
     );
+  });
+
+  it("binds cursors to lifecycle and canonical normalized term sequences", async () => {
+    const { master } = setup();
+    await master.createResource(valid);
+    await master.createResource({
+      ...valid,
+      attributes: { ...valid.attributes, color: "NEGRO" },
+    });
+
+    const first = await master.searchResources({ terms: " CÂB   CÓBRE ", limit: 1 });
+    if (!first.ok || first.value.cursor === null) throw new Error("expected a cursor");
+
+    expect(
+      await master.searchResources({ terms: "cab cobre", limit: 1, cursor: first.value.cursor }),
+    ).toMatchObject({ ok: true });
+    expect(
+      await master.searchResources({ terms: "cab aluminio", limit: 1, cursor: first.value.cursor }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_ARGUMENT" } });
+    expect(
+      await master.searchResources({
+        terms: "cab cobre",
+        lifecycle: "ALL",
+        limit: 1,
+        cursor: first.value.cursor,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_ARGUMENT" } });
+    expect(
+      await master.searchResources({ terms: "cab cobre", limit: 1, cursor: "v2:broken" }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_ARGUMENT" } });
+  });
+
+  it("completes deterministic keyset pagination beyond 1000 resources", async () => {
+    const repository = new InMemoryResourceRepository();
+    const resources = Array.from({ length: 1_005 }, (_, index): PersistedResource => {
+      const ordinal = String(index + 1).padStart(4, "0");
+      return {
+        resourceId: `resource-${ordinal}`,
+        classCode: "MATERIAL",
+        familyCode: "CONDUCTORES",
+        typeCode: "CABLE",
+        naturalUnitCode: "M",
+        attributes: [],
+        canonicalIdentity: `identity-${ordinal}`,
+        identityPolicyVersion: "v1",
+        active: true,
+        revision: 1,
+        searchProjection: "cab",
+      };
+    });
+    await Promise.all(resources.map((resource) => repository.createIfIdentityAbsent(resource)));
+    const master = createResourceMaster({ catalog: cableCatalog, repository });
+
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const page = await master.searchResources({ terms: "cab", limit: 50, cursor });
+      if (!page.ok) throw new Error(`pagination failed after ${ids.length} resources`);
+      ids.push(...page.value.items.map((item) => item.resourceId));
+      cursor = page.value.cursor;
+    } while (cursor !== null);
+
+    expect(ids).toEqual(resources.map((resource) => resource.resourceId));
   });
 });
