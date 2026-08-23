@@ -58,13 +58,25 @@ export class InMemoryResourceRepository implements ResourceRepository {
     return resource === undefined ? null : structuredClone(resource);
   }
 
-  async listPage({ lifecycle, offset, limit }: Parameters<ResourceRepository["listPage"]>[0]) {
+  async listPage({
+    lifecycle,
+    afterResourceId,
+    limit,
+  }: Parameters<ResourceRepository["listPage"]>[0]) {
     const resources = [...this.#byId.values()]
-      .filter((resource) => lifecycle === "ALL" || resource.active === (lifecycle === "ACTIVE"))
-      .sort((left, right) => left.resourceId.localeCompare(right.resourceId));
+      .filter(
+        (resource) =>
+          (lifecycle === "ALL" || resource.active === (lifecycle === "ACTIVE")) &&
+          (afterResourceId === undefined || resource.resourceId > afterResourceId),
+      )
+      .sort((left, right) =>
+        left.resourceId < right.resourceId ? -1 : left.resourceId > right.resourceId ? 1 : 0,
+      );
+    const selected = resources.slice(0, limit);
     return {
-      resources: structuredClone(resources.slice(offset, offset + limit)),
-      hasMore: offset + limit < resources.length,
+      resources: structuredClone(selected),
+      lastScannedResourceId: selected.at(-1)?.resourceId ?? null,
+      hasMore: resources.length > limit,
     };
   }
 }
