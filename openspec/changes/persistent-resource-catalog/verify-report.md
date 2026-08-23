@@ -250,3 +250,249 @@ Changed-source coverage reported by `corepack pnpm test`: `application/resource-
 ## Next recommendation
 
 Parent may settle the bounded `slice-b-independent-verification` checkpoint as passed and preserve this exact Slice B boundary. Continue only through the parent-controlled Feature Branch Chain into Slice C; never treat this report as final verify, sync, archive, cutover, PR, or deployment readiness.
+
+---
+
+# Slice C Independent Verification Checkpoint — Convex persistence and internal bootstrap
+
+## Status
+
+**FAIL (evidence compliance) — implementation behavior is green, but this bounded Slice C checkpoint cannot receive a clean pass because strict-TDD evidence for C3/C4 remains explicitly incomplete in the cumulative `TDD Cycle Evidence` table.** This is an intermediate checkpoint, not final verify/sync/archive. Slice D remains blocked and D1–D4 remain unchecked.
+
+## Executive summary
+
+Independent source inspection and execution found no functional Slice C defect. The additive schema has one `resourceCatalogSnapshots` aggregate and `by_catalog_key` index. Production catalog loading has exactly one indexed `.take(2)`, deterministic 0/1/>1 mapping, no catalog `.collect()`, and no catalog N+1. The internal installer validates before write, rejects duplicate authority, checks same-source/full-payload replay before OCC, validates compatible replacement, advances revision, reads back through the normal parser, compares the complete snapshot, and relies on the Convex transaction for rollback.
+
+The generated/public transport remains narrow: `api.d.ts` adds only the two modules to `fullApi`, `api` remains filtered to public references, `internal` contains the bootstrap, and `dataModel.d.ts`/`server.d.ts` have no textual diff. No public mutation/query/action/http/schedule/proxy or arbitrary CRUD exists.
+
+Production composition remains static and unserved. `convex-resource-master.ts`, the static reader, production Cable literal, and Resource repository are byte-for-byte unchanged from `HEAD`; the static reader still serves both roots. No D cutover, literal deletion, static-reader deletion, fallback, dual read, deployment-payload runtime composition import, or Resource Search hydration change exists.
+
+All executable gates passed: focused Convex 18/18, backend 63/63, repository 65/65 with coverage, backend/root typechecks, architecture, format, build, and whitespace. The complete candidate is exactly `+936/-0`. The retained out-of-tree chain states exactly match the current final candidate and independently passed import closure, focused tests, and TypeScript compile at U1 6/6, U2 8/8, U3 16/16, and U4 18/18.
+
+The blocker is evidence quality, not product behavior: the only cumulative C `TDD Cycle Evidence` table still marks C3 “Partial only” and C4 “Not complete.” The later completion addendum records green tests and operational success but explicitly claims no new RED/GREEN cycle and does not replace the incomplete table with complete C3/C4 evidence. Strict TDD requires incomplete evidence to be CRITICAL.
+
+## Structured status and action context
+
+- Active change: `persistent-resource-catalog`; branch: `feat/persistent-catalog-convex-persistence`.
+- Parent supplied native `proceed` for `slice-c-independent-verification`; parent owns token and settle. No attempt command was run and no token/state was persisted.
+- Native authoritative OpenSpec status: `artifactStore=openspec`, `applyState=ready`, `nextRecommended=apply`, `blockedReasons=[]`; native aggregate checkbox count is 24 total / 12 complete / 12 pending because it includes four remaining implementation rows and eight parent-owned rows.
+- Implementation-owned state: A1–C4 are checked; exactly D1–D4 remain unchecked. Therefore full native verify/archive remain blocked.
+- `actionContext.mode=repo-local`; workspace and allowed edit root are `/home/garfex/PROGRAMACION/garfex-platform`; all implementation and report paths are inside the authoritative root.
+- Hybrid inputs were read directly from OpenSpec and Engram topics `sdd/persistent-resource-catalog/spec`, `tasks`, and `apply-progress`. OpenSpec is authoritative; Engram task/apply summaries lag the final OpenSpec C3/C4 checkboxes but the OpenSpec apply completion addendum records their completion.
+- Strict TDD is active from `openspec/config.yaml`; global strict-TDD verification guidance was loaded because no project override exists.
+- CodeGraph index was present. MCP initialization was unavailable, so the read-only upstream `codegraph status`/`codegraph explore` fallback was used before targeted source inspection.
+- Verification made no product, test, task-checkbox, Git index/ref, deployment, issue, PR, or local Convex data change.
+
+## Slice C specification coverage
+
+| Acceptance area | Result | Independent evidence |
+| --- | --- | --- |
+| Aggregate schema/index and bounded singleton | **PASS** | One table and `by_catalog_key`; one production `.take(2)` in shared `findDocuments`; 0/1/>1 tests pass; no catalog collect/filter/N+1. |
+| Strict transport and Domain reconstruction | **PASS** | Explicit Convex validators protect storage/transport; candidate and stored documents pass pure strict parser/semantic validation; metadata is reconstructed away. |
+| Four enforced bounds | **PASS with test warning** | Production parser calls `assertResourceCatalogBounds` before shape/semantics on write and read. Cumulative foundation tests prove exact/over byte, depth, array, and object bounds. Slice C records 3,317/8/5/9 and headroom 764,683/4/4,091/503. |
+| Semantic equality and independent payload equivalence | **PASS** | Parser-fixed JSON equality includes all fields/order; 11 semantic variants compare unequal; fixture and deployment payload are separate copies and compare equal. |
+| Internal-only bootstrap | **PASS** | Sole registered write is object-form `internalMutation`; generated public filter and runtime test expose no public bootstrap. No query/public mutation/action/http/schedule/proxy/CRUD exists. |
+| Exact install protocol | **PASS** | Expected revision and candidate parse precede DB mutation; duplicate current authority is rejected; current is parsed; replay precedes OCC; conflict is read-only; compatibility precedes revision/write; read-back uses normal parser and full snapshot equality. |
+| Atomic rollback | **PASS** | `convex-test` corrupting-writer/read-back mismatch aborts and preserves revision 1; forced mutation failure leaves zero documents. |
+| Staged candidate remains unserved | **PASS** | Static composition is unchanged and test proves staged family name is not served. Production Cable hash matches `HEAD`: `ded7df4970fd8e0de8804a70c7d81e61d70aa7dca3525e70e654a5a6bb2eb74c`. |
+| Generated/transport narrowness | **PASS** | Only `api.d.ts` changes (`+4`); `dataModel.d.ts` and `server.d.ts` have no diff; bootstrap is internal-only and installer is absent from Public/index/ResourceMaster transport. |
+| Local-anonymous rehearsal credibility | **PASS (documentary; not replayed)** | Apply completion identifies `anonymous:anonymous-agent` at `127.0.0.1:3210`, no deployment key, one synchronization, then `expectedRevision:0 -> INSTALLED revision 1` and stale `99 -> UNCHANGED revision 1`. Current target fields match and process `CONVEX_DEPLOY_KEY` is unset. Verification intentionally ran no deployment-affecting command. |
+| No D scope creep | **PASS** | No composition switch, static/literal deletion, public surface, Search hydration, tooling/docs cutover, or other path outside the exact eight-file candidate manifest. |
+
+## Exact product candidate and chain manifests
+
+Final candidate against `HEAD`:
+
+| Path | Additions | Deletions |
+| --- | ---: | ---: |
+| `apps/backend/convex/resourceCatalogValidators.ts` | 85 | 0 |
+| `apps/backend/convex/resourceCatalogBootstrap.ts` | 69 | 0 |
+| `apps/backend/convex/schema.ts` | 9 | 0 |
+| `apps/backend/convex/_generated/api.d.ts` | 4 | 0 |
+| `apps/backend/src/resource-master/deployment/cable-catalog-v1.ts` | 116 | 0 |
+| `apps/backend/src/resource-master/infrastructure/convex-resource-catalog.ts` | 116 | 0 |
+| `apps/backend/tests/convex-resource-catalog.test.ts` | 514 | 0 |
+| `apps/backend/tests/convex-resource-master.test.ts` | 23 | 0 |
+| **Total** | **936** | **0** |
+
+Immediate-parent chain units independently reproduced from retained isolated states:
+
+| Unit | Exact immediate-parent manifest | Budget | Import closure | Tests | Compile |
+| --- | --- | ---: | --- | --- | --- |
+| U1 foundation / `HEAD` | validators `+85`; schema `+9`; temporary complete catalog test `+40` | **134** | 35 TS files / 75 relative imports / 0 missing | **6/6 PASS** | **PASS** |
+| U2 reader / U1 | deployment payload `+116`; adapter `+116`; catalog test `+46/-26` | **304** | 37 TS files / 82 relative imports / 0 missing | **8/8 PASS** | **PASS** |
+| U3 bootstrap / U2 | internal bootstrap `+69`; generated API `+4`; staged-unserved regression `+23`; catalog test `+270/-20` | **386** | 38 TS files / 95 relative imports / 0 missing | **16/16 PASS** | **PASS** |
+| U4 complete / U3 | final semantic/order/measurement/bound test blocks `+204` | **204** | 38 TS files / 95 relative imports / 0 missing | **18/18 PASS** | **PASS** |
+
+All units are `<=400`, use the approved Feature Branch Chain immediate-parent boundary, keep tests beside behavior, need no `size:exception`, and pass isolated whitespace checks. Byte comparison confirms all eight U4 candidate files exactly match the current workspace. The first import-closure probe incorrectly omitted `.d.ts` resolution and failed on generated `server.d.ts -> dataModel.js`; the corrected non-mutating probe included declaration resolution and passed all four states.
+
+## Strict TDD compliance
+
+| Check | Result | Details |
+| --- | --- | --- |
+| TDD evidence table present | **PASS** | Apply-progress contains a Slice C table for C1–C4. |
+| Reported tests exist | **PASS** | Both Convex test files exist and execute against real `convex-test`. |
+| C1/C2 RED and GREEN evidence | **PASS** | Missing-module RED is recorded; current focused/backend/root GREEN remains true. |
+| C3/C4 complete evidence | **CRITICAL FAIL** | The table explicitly records C3 as partial and C4 as not complete. Later prose does not provide a replacement complete RED/GREEN/TRIANGULATE/REFACTOR table and explicitly claims no new RED/GREEN cycle. |
+| GREEN remains true | **PASS** | Focused 18/18, backend 63/63, root 65/65, and U1–U4 isolated checkpoints pass. |
+| Safety net | **PASS** | Backend and root suites pass; static serving and Resource repository regressions remain green. |
+| Triangulation | **PASS with warning** | Singleton, failures, OCC/replay, replacement, history, rollback, equality, bounds, and static-unserved paths vary real outcomes. Slice C’s “encoded source version” case is a 128-character field-bound test, not a max-byte overflow test. |
+
+**TDD compliance: CRITICAL — C3/C4 evidence is incomplete despite current GREEN behavior.**
+
+### Test layer distribution
+
+| Layer | Tests | Files | Tools |
+| --- | ---: | ---: | --- |
+| Convex integration | 13 Slice C tests | 2 | Vitest 4.1.11 + `convex-test` edge runtime |
+| Existing focused regression | 5 tests | 1 shared file | Vitest + `convex-test` |
+| E2E | 0 | 0 | Not required for this internal pre-cutover slice |
+
+### Assertion quality
+
+- No tautologies, ghost loops, assertion-free production paths, smoke-only tests, CSS assertions, or mock-heavy suites were found.
+- Fixed loops contain 11 and 4 literal cases, so assertions cannot silently skip through an empty collection.
+- **WARNING:** `convex-resource-catalog.test.ts:471` labels `sourceVersion: "x".repeat(129)` as an encoded-size overflow, but it exercises the 128-character source-version field limit, not `maxBytes=768000`. Cumulative foundation tests do prove the generic max-byte bound, so runtime coverage exists, but the Slice C assertion’s label/claim is overstated.
+
+### Changed-file coverage
+
+Root coverage passed at 91.16% statements / 81.61% branches / 99.06% functions / 92.72% lines. Reported executable changed files include:
+
+- `convex/resourceCatalogBootstrap.ts`: 100% lines, 62.5% branches.
+- `infrastructure/convex-resource-catalog.ts`: 91.48% lines, 86.04% branches; uncovered lines 58, 81, 84, 90.
+- Schema, validators, payload, generated declarations, and test-only files are omitted or not meaningfully represented by the summarized executable coverage table.
+
+No executable changed file reported by coverage is below 80% line coverage.
+
+### Quality metrics
+
+- Format: **PASS**, Biome checked 89 files with no fixes.
+- Type checker: **PASS**, backend `tsc --noEmit`, direct backend `tsc`, root tooling typecheck, and root build.
+- LSP: **UNAVAILABLE**, `typescript-language-server` command not found; CLI diagnostics are clean.
+- Architecture: **PASS**, 2 tests and 44 modules cruised.
+- Whitespace: **PASS**, current and all four isolated unit diffs.
+
+## Commands and exact results
+
+- `gentle-ai sdd-status persistent-resource-catalog --cwd /home/garfex/PROGRAMACION/garfex-platform --json --instructions` — **PASS**, authoritative status consumed; no attempt command.
+- `codegraph status && codegraph explore "Slice C persistent resource catalog Convex schema reader installer bootstrap generated API static composition search hydration"` — **PASS** via read-only CLI fallback; index present.
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/convex-resource-catalog.test.ts tests/convex-resource-master.test.ts` — **PASS**, 2 files / 18 tests.
+- `corepack pnpm --filter @garfex/backend test` — **PASS**, 9 files / 63 tests.
+- `corepack pnpm --filter @garfex/backend typecheck` — **PASS**.
+- `corepack pnpm --filter @garfex/backend exec tsc --noEmit --pretty false` — **PASS**.
+- `corepack pnpm typecheck` — **PASS**.
+- `corepack pnpm format:check` — **PASS**, 89 files.
+- `corepack pnpm test:architecture` — **PASS**, 2 tests; architecture check passed over 44 modules.
+- `corepack pnpm test` — **PASS**, 10 files / 65 tests; coverage 91.16/81.61/99.06/92.72.
+- `corepack pnpm build` — **PASS**, root `tsc -b`.
+- `git diff --check` — **PASS**.
+- `corepack pnpm --filter @garfex/backend exec typescript-language-server --version` — **FAIL/UNAVAILABLE**, command not found.
+- Corrected isolated import-closure/focused-test/compile command — **PASS** for U1 6, U2 8, U3 16, U4 18 tests and zero missing imports.
+- Immediate-parent `git diff --no-index --numstat`/whitespace accounting — **PASS**, exact U1 134, U2 304, U3 386, U4 204.
+- U4/current eight-file `cmp` — **PASS**, all files match.
+- No `convex dev`, `convex run`, codegen, deployment, production, mutation, commit, branch, push, PR, merge, issue, acquire, or settle command was run by verification.
+
+## Task completion and exact blockers
+
+No unchecked A–C implementation row remains. The following exact D rows are CRITICAL final-change/archive blockers and are approved remaining scope, not Slice C product defects:
+
+```text
+- [ ] Add failing cutover/regression expectations to `apps/backend/tests/convex-resource-master.test.ts` and `apps/backend/tests/resource-master.test.ts`, and add architecture-failure fixtures at `tooling/architecture-fixtures/violations/resource-master/fixture-import.ts`, `runtime-deployment-import.ts`, `public-catalog-port.ts`, and `tooling/architecture-fixtures/violations/convex/public-bootstrap-wrapper.ts`; extend `tooling/tests/architecture.test.ts` to expect production fixture/deployment imports, public installer/bootstrap exposure, and missing stable Convex error literals to fail before D’s wiring changes. <!-- sdd-owner: implementation -->
+- [ ] Change `apps/backend/src/resource-master/infrastructure/convex-resource-master.ts` so each query and mutation invocation constructs a fresh `ConvexResourceCatalogReader(ctx.db)` beside the existing repository, change `apps/backend/convex/resourceMaster.ts` to add the three exact stable error literals to its return validator without swallowing them as `INTERNAL`, update `apps/backend/tests/convex-resource-master.test.ts` to seed through generated `internal.resourceCatalogBootstrap.installCableCatalogV1` before valid public operations, then delete `apps/backend/src/resource-master/infrastructure/static-resource-catalog-reader.ts` and `apps/backend/src/resource-master/infrastructure/cable-catalog.ts`; retain independent `apps/backend/src/resource-master/deployment/cable-catalog-v1.ts` and `apps/backend/tests/fixtures/cable-catalog.ts` with no runtime import. <!-- sdd-owner: implementation -->
+- [ ] Change `tooling/architecture/check.mjs` and `tooling/tests/architecture.test.ts` to reject production imports from `apps/backend/tests/fixtures`, runtime imports from `apps/backend/src/resource-master/deployment`, Application-to-Infrastructure imports, core Convex imports, public writer/installer/bootstrap exports, and public/action/http/scheduled bootstrap wrappers while accepting only the direct internal bootstrap-to-payload dependency; complete `apps/backend/tests/convex-resource-master.test.ts` regression coverage for absent/empty/invalid/unavailable catalog codes on all ten entrypoints, stable IDs/canonical identities across catalog replacement, search one-load behavior with unchanged Resource attribute hydration, and no public bootstrap in generated `api` types. <!-- sdd-owner: implementation -->
+- [ ] After all D tests are green, update `docs/architecture.md` and `README.md` with the aggregate/port boundary, one-load/no-cache rule, artifact separation, cutover order, non-production CLI rehearsal, explicit production authorization, and Convex-only rollback/fix-forward rule; then run the final focused tests, LSP diagnostics, Convex codegen/type validation, architecture checks, build, and `corepack pnpm check` without changing the excluded Resource Search hydration or adding new product surfaces. <!-- sdd-owner: implementation -->
+```
+
+Exact checkpoint blocker: update/reconcile the strict-TDD evidence for C3/C4 so the persisted table no longer states partial/not-complete and accurately binds the existing test history and green execution. Verification must not invent that history or change product/tests/tasks.
+
+## Review workload and next recommendation
+
+The approved `feature-branch-chain` strategy is respected. U1/U2/U3/U4 are exact immediate-parent units of 134/304/386/204 lines; no unit exceeds 400, no size exception is used, and tests stay with behavior. The complete candidate is not proposed as one PR.
+
+`next_recommended=parent-lifecycle`: parent should settle this verification as failed evidence compliance, reconcile the C3/C4 strict-TDD record without changing product behavior, and launch a bounded independent re-verification. Slice D must not start from a clean checkpoint claim until that CRITICAL evidence issue is resolved. Final verify/sync/archive remain blocked by D1–D4.
+
+---
+
+# Slice C Bounded Re-verification — TDD evidence remediation
+
+## Status
+
+**PASS — the prior CRITICAL Slice C evidence-compliance finding is closed.** The corrected cumulative `TDD Cycle Evidence` table truthfully marks C3 and C4 complete while preserving the original pre-implementation missing-module RED and treating the earlier missing-target rehearsal failure only as historical operational evidence. No post-implementation RED was fabricated.
+
+This is an intermediate Slice C checkpoint only. It is not final verify/sync/archive readiness, does not authorize Slice D, and does not authorize any deployment, Git, or GitHub action.
+
+## Executive summary and prior finding closure
+
+The sole prior critical finding was that the cumulative TDD table still labeled C3 partial and C4 incomplete despite later completion evidence. The table now records C3's 18-test GREEN matrix plus the documented local-anonymous `expectedRevision: 0 -> INSTALLED` revision `1` and stale `99 -> UNCHANGED` revision `1` rehearsal. It records C4's format/type/codegen/build/architecture evidence and exact U1/U2/U3/U4 immediate-parent boundaries of `134/304/386/204` changed lines. Those statements match the preserved completion addendum and prior independent verification evidence.
+
+Bounded current execution reconfirmed focused Convex GREEN at 18/18, backend typecheck, repository formatting, architecture checks, and whitespace. The product candidate has no drift from the previously verified manifest: tracked additions remain `4 + 9 + 23`, untracked files remain `69 + 85 + 116 + 116 + 514`, totaling exactly `+936/-0`. The serving Cable authority remains byte-for-byte equal to `HEAD` at SHA-256 `ded7df4970fd8e0de8804a70c7d81e61d70aa7dca3525e70e654a5a6bb2eb74c`, so the staged candidate remains unserved and no D cutover occurred.
+
+## Structured status and action context
+
+- Active change: `persistent-resource-catalog`; parent supplied native `proceed` for `slice-c-reverification`, maximum two attempts/400 lines, and owns token/settle.
+- No acquire/status/settle attempt command was run.
+- Authoritative store: OpenSpec with configured Engram mirror; required spec, tasks, and apply-progress were read from both active backends.
+- `actionContext.mode=repo-local`; workspace and allowed edit root are `/home/garfex/PROGRAMACION/garfex-platform`; all implementation and report paths are inside that authoritative root.
+- Strict TDD is active from `openspec/config.yaml`; global strict-TDD verification guidance was loaded because no project-local override exists.
+- CodeGraph index was present; MCP initialization was unavailable, so read-only upstream `codegraph status` and `codegraph explore` were used before targeted source inspection.
+- Verification changed only this cumulative report and its Engram mirror. No product/test/task/deployment/Git/GitHub mutation occurred.
+
+## Spec and checkpoint coverage
+
+| Slice C checkpoint | Result | Evidence |
+| --- | --- | --- |
+| C1 RED contract | **PASS** | Corrected table preserves the clean-`HEAD` missing-deployment-module collection failure as the pre-implementation RED. |
+| C2 GREEN implementation | **PASS** | Current adapter/bootstrap source retains one indexed `.take(2)`, strict reconstruction, replay-before-OCC, atomic replacement/read-back, and internal-only mutation behavior. |
+| C3 TRIANGULATE | **PASS** | Current 18-test matrix passes singleton, invalid/empty/storage mapping, bounds, bounded read, install/replay/conflict/replacement, stable ownership, inactive history, rollback, equivalence, public-surface, and staged-unserved cases. Documentary operational output remains `INSTALLED` revision 1 then stale replay `UNCHANGED` revision 1. |
+| C4 REFACTOR | **PASS** | Typecheck, format, architecture, and whitespace reruns pass; prior codegen/build evidence remains valid because the exact product manifest has not drifted. |
+| Review workload | **PASS** | Feature Branch Chain remains U1 `134`, U2 `304`, U3 `386`, U4 `204`; every unit is `<=400`, tests stay with behavior, and no `size:exception` is used. |
+| Scope boundary | **PASS** | Static query/mutation composition and production Cable authority remain unchanged; no D path, public bootstrap, fallback, dual read, Search hydration change, or cutover exists. |
+
+## Strict TDD compliance
+
+| Check | Result | Details |
+| --- | --- | --- |
+| TDD evidence table present | **PASS** | C1-C4 rows are present with all eight columns. |
+| Reported tests exist | **PASS** | `convex-resource-catalog.test.ts` and `convex-resource-master.test.ts` exist and run with real `convex-test`. |
+| RED chronology truthful | **PASS** | The historical missing-module RED remains pre-implementation; no new C4 behavior RED or post-implementation RED is claimed. |
+| GREEN remains true | **PASS** | Focused Convex tests pass 18/18. |
+| Triangulation adequate | **PASS** | Tests vary singleton states, failures, OCC/replay/replacement, rollback, semantic fields/order, bounds, inactive history, public reachability, and serving authority. |
+| Safety net | **PASS** | Backend typecheck, formatting, architecture, and whitespace checks pass; prior backend/root/build gates are bound to an unchanged candidate. |
+
+Test distribution remains 13 Slice C Convex integration cases plus 5 existing focused Convex regressions across two files; no E2E layer is required for this internal pre-cutover slice.
+
+**Assertion quality:** PASS. The tests invoke real parser, adapter, Convex database, and internal mutation behavior; fixed 11-case and 4-case loops are non-empty. No tautology, ghost loop, assertion-free production path, type-only-only assertion, smoke-only test, CSS assertion, or mock-heavy suite was found. The prior non-blocking warning remains: the `encoded source version` case exercises the 128-character field bound rather than the generic 768,000-byte maximum, while cumulative foundation tests cover the true byte bound.
+
+## Commands and evidence
+
+- `codegraph status && codegraph explore "Slice C persistent resource catalog Convex bootstrap adapter tests product drift"` — **PASS**; index present, read-only exploration completed. CodeGraph reported pending candidate changes but read current on-disk source.
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/convex-resource-catalog.test.ts tests/convex-resource-master.test.ts` — **PASS**, 2 files / 18 tests.
+- `corepack pnpm --filter @garfex/backend typecheck` — **PASS**, `tsc --noEmit` with no diagnostics.
+- `corepack pnpm format:check` — **PASS**, Biome checked 89 files with no fixes.
+- `corepack pnpm test:architecture` — **PASS**, 1 file / 2 tests; architecture check passed over 44 modules.
+- `git diff --check` — **PASS**.
+- Focused checkbox/status/numstat/hash probe — **PASS**: C1-C4 checked, exact D1-D4 implementation rows unchecked, candidate `+936/-0`, and serving authority hash equals `HEAD`.
+- No `convex dev`, `convex run`, codegen, build, deployment, production, acquire, settle, commit, branch, push, issue, PR, or merge command was run during this bounded re-verification.
+
+## Task completion and exact remaining implementation scope
+
+No unchecked A-C implementation marker remains. C1, C2, C3, and C4 are visibly checked. The exact unchecked implementation lines are D1-D4:
+
+```text
+- [ ] Add failing cutover/regression expectations to `apps/backend/tests/convex-resource-master.test.ts` and `apps/backend/tests/resource-master.test.ts`, and add architecture-failure fixtures at `tooling/architecture-fixtures/violations/resource-master/fixture-import.ts`, `runtime-deployment-import.ts`, `public-catalog-port.ts`, and `tooling/architecture-fixtures/violations/convex/public-bootstrap-wrapper.ts`; extend `tooling/tests/architecture.test.ts` to expect production fixture/deployment imports, public installer/bootstrap exposure, and missing stable Convex error literals to fail before D’s wiring changes. <!-- sdd-owner: implementation -->
+- [ ] Change `apps/backend/src/resource-master/infrastructure/convex-resource-master.ts` so each query and mutation invocation constructs a fresh `ConvexResourceCatalogReader(ctx.db)` beside the existing repository, change `apps/backend/convex/resourceMaster.ts` to add the three exact stable error literals to its return validator without swallowing them as `INTERNAL`, update `apps/backend/tests/convex-resource-master.test.ts` to seed through generated `internal.resourceCatalogBootstrap.installCableCatalogV1` before valid public operations, then delete `apps/backend/src/resource-master/infrastructure/static-resource-catalog-reader.ts` and `apps/backend/src/resource-master/infrastructure/cable-catalog.ts`; retain independent `apps/backend/src/resource-master/deployment/cable-catalog-v1.ts` and `apps/backend/tests/fixtures/cable-catalog.ts` with no runtime import. <!-- sdd-owner: implementation -->
+- [ ] Change `tooling/architecture/check.mjs` and `tooling/tests/architecture.test.ts` to reject production imports from `apps/backend/tests/fixtures`, runtime imports from `apps/backend/src/resource-master/deployment`, Application-to-Infrastructure imports, core Convex imports, public writer/installer/bootstrap exports, and public/action/http/scheduled bootstrap wrappers while accepting only the direct internal bootstrap-to-payload dependency; complete `apps/backend/tests/convex-resource-master.test.ts` regression coverage for absent/empty/invalid/unavailable catalog codes on all ten entrypoints, stable IDs/canonical identities across catalog replacement, search one-load behavior with unchanged Resource attribute hydration, and no public bootstrap in generated `api` types. <!-- sdd-owner: implementation -->
+- [ ] After all D tests are green, update `docs/architecture.md` and `README.md` with the aggregate/port boundary, one-load/no-cache rule, artifact separation, cutover order, non-production CLI rehearsal, explicit production authorization, and Convex-only rollback/fix-forward rule; then run the final focused tests, LSP diagnostics, Convex codegen/type validation, architecture checks, build, and `corepack pnpm check` without changing the excluded Resource Search hydration or adding new product surfaces. <!-- sdd-owner: implementation -->
+```
+
+These D rows are CRITICAL final-change/archive blockers and approved remaining scope, not Slice C defects. Archive is not ready.
+
+## Findings, blockers, risks, and next recommendation
+
+- **Prior CRITICAL finding:** **CLOSED**; the corrected C3/C4 evidence table is complete, internally consistent, and supported by preserved and current evidence.
+- **Current Slice C critical defects:** none.
+- **Final-change/archive blockers:** exact D1-D4 lines above plus parent-owned lifecycle gates.
+- **WARNING:** the Slice C `encoded source version` test label overstates byte-bound coverage; generic byte overflow is covered in the cumulative Domain foundation tests.
+- **Operational risk:** the `INSTALLED`/`UNCHANGED` rehearsal was documentary in this re-verification and intentionally not replayed because deployment-affecting commands were prohibited.
+
+`next_recommended=parent-lifecycle`: parent may settle `slice-c-reverification` as passed and preserve this exact bounded Slice C checkpoint. Do not begin D, final verify, sync, archive, deployment, or publication from this executor.
