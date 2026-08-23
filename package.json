@@ -1,0 +1,30 @@
+{
+  "name": "garfex-platform",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Contract-first modular backend foundation for GARFEX.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.19.0 <25",
+    "pnpm": ">=11.0.0 <12"
+  },
+  "packageManager": "pnpm@11.0.0",
+  "scripts": {
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "typecheck": "tsc --noEmit -p tooling/tsconfig.json",
+    "test": "vitest run --coverage",
+    "test:architecture": "vitest run tooling/tests/architecture.test.ts && node tooling/architecture/check.mjs",
+    "build": "tsc -b",
+    "check": "biome format . && biome lint . && tsc --noEmit -p tooling/tsconfig.json && vitest run --coverage && vitest run tooling/tests/architecture.test.ts && node tooling/architecture/check.mjs && tsc -b"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.10",
+    "@types/node": "24.13.3",
+    "@vitest/coverage-v8": "4.1.11",
+    "dependency-cruiser": "18.2.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

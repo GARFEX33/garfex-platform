@@ -1,0 +1,31 @@
+# Local Pi runtime state
+.atl/
+.pi/gentle-ai/
+
+# Keep repository-owned Pi skills reviewable
+!.pi/skills/
+
+# Dependencies and generated output
+node_modules/
+coverage/
+dist/
+*.tsbuildinfo
+
+# Environment and local secrets (safe examples/templates stay reviewable)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+!.env.*.example
+!.env.*.sample
+!.env.*.template
+
+# Logs and editor/OS noise
+*.log
+.DS_Store
+.idea/
+.vscode/
+
+# Local tool state
+.codegraph/

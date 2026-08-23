@@ -1,0 +1,19 @@
+{
+  "name": "@garfex/backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "vitest run && tsc --noEmit"
+  },
+  "dependencies": {
+    "convex": "1.45.0"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "5.0.0",
+    "convex-test": "0.0.56",
+    "vitest": "4.1.11"
+  }
+}
