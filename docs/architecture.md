@@ -4,6 +4,11 @@ The repository is a modular backend with one implemented capability:
 `apps/backend/src/resource-master/`. Its Resource Master v2 Cable slice keeps business rules
 framework-neutral and isolates Convex behind application-owned ports and infrastructure adapters.
 
+Authentication and authorization will follow the provider-neutral
+[auth boundary](./auth-boundary.md): the transport/composition edge creates a trusted actor context,
+the application enforces capabilities deny-by-default, and the Domain remains auth-free. This boundary
+is blocking before the internal UI or externally reachable managed mutations are introduced.
+
 ## Current layout
 
 ```text
@@ -126,4 +131,6 @@ src/modules/<module>/
 
 Temporal workflows, agent harnesses, additional transports, and other persistence technologies are
 not implemented. When introduced, they remain edge adapters and follow the same public contract and
-ownership rules rather than becoming dependencies of core code.
+ownership rules rather than becoming dependencies of core code. Authentication is also not yet
+implemented; its approved boundary and staged plan are documented in
+[`docs/auth-boundary.md`](./auth-boundary.md).

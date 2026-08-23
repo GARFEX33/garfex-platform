@@ -25,6 +25,7 @@ pnpm check
 | `tooling/architecture/` | Executable dependency and ownership checks. |
 | `tooling/architecture-fixtures/` | Controlled valid and invalid graphs used to prove the checks. |
 | `docs/architecture.md` | Current layer rules and the shape required for future modules. |
+| `docs/auth-boundary.md` | Approved provider-neutral auth boundary and staged plan for the upcoming internal UI. |
 
 ## Work with the backend
 
@@ -69,4 +70,5 @@ import the infrastructure composition adapter but not domain or application inte
 Only the Cable catalog (`MATERIAL / CONDUCTORES / CABLE`) exists today. Other resource families,
 additional business modules, UI/API transports beyond Convex functions, authentication,
 Temporal workflows, agent integrations, and production deployment automation are explicitly
-deferred.
+deferred. Authentication is not implemented; its approved boundary must be enforced before the
+internal UI or externally reachable managed mutations are introduced.
