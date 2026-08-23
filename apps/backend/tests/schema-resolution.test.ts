@@ -3,6 +3,8 @@ import {
   evaluateApplicability,
   resolveEffectiveBindings,
 } from "../src/resource-master/domain/schema.js";
+import { parseResourceCatalogPayload } from "../src/resource-master/domain/catalog-snapshot.js";
+import { cableCatalog } from "./fixtures/cable-catalog.js";
 import type { ApplicabilityBinding } from "../src/resource-master/domain/types.js";
 
 const family: ApplicabilityBinding = {
@@ -58,6 +60,26 @@ describe("effective schema resolution", () => {
 
     expect(messages[0]).toMatch(/duplicate FAMILY binding.*CONDUCTORES.*color/i);
     expect(messages[1]).toBe(messages[0]);
+  });
+
+  it("validates the complete Cable snapshot without replacing effective-binding semantics", () => {
+    const snapshot = parseResourceCatalogPayload({
+      catalogKey: "resource-master",
+      schemaVersion: 1,
+      sourceVersion: "cable-catalog-v1",
+      lifecycle: "ACTIVE",
+      catalog: cableCatalog,
+    });
+    expect(
+      resolveEffectiveBindings(snapshot.catalog.bindings, "CONDUCTORES", "CABLE"),
+    ).toHaveLength(5);
+    expect(snapshot.catalog.presentation.attributeOrder).toEqual([
+      "conductor_material",
+      "gauge",
+      "insulation",
+      "color",
+      "voltage",
+    ]);
   });
 
   it("uses explicit defaults, accepts identical matches, and rejects conflicting matches", () => {
