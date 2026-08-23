@@ -4,6 +4,8 @@ export const resourceErrorCodes = [
   "DUPLICATE",
   "INVALID_REFERENCE",
   "VALIDATION",
+  "CONFLICT",
+  "INVALID_LIFECYCLE",
   "INTEGRITY",
   "INTERNAL",
 ] as const;
@@ -14,6 +16,7 @@ export interface ResourceError {
   readonly message: string;
   readonly details?: string[];
   readonly existingResourceId?: string;
+  readonly currentRevision?: number;
 }
 export type Result<T> =
   | { readonly ok: true; readonly value: T }
@@ -26,6 +29,17 @@ export interface CreateResourceInput {
   readonly naturalUnitCode: string;
   readonly attributes: Readonly<Record<string, unknown>>;
 }
+export interface UpdateNonIdentityDataInput {
+  readonly resourceId: string;
+  readonly expectedRevision: number;
+  readonly naturalUnitCode: string;
+}
+export interface DeactivateResourceInput {
+  readonly resourceId: string;
+  readonly expectedRevision: number;
+}
+export type ResourceLifecycleFilter = "ACTIVE" | "INACTIVE" | "ALL";
+
 export interface TaxonomyView {
   readonly code: string;
   readonly name: string;
@@ -73,7 +87,7 @@ export interface ResourceView {
   readonly attributes: ResourceAttributeView[];
   readonly canonicalIdentity: string;
   readonly identityPolicyVersion: "v1";
-  readonly active: true;
+  readonly active: boolean;
   readonly revision: number;
 }
 export interface ResourceSummary {
@@ -108,9 +122,12 @@ export interface ResourceMaster {
     }>
   >;
   createResource(input: CreateResourceInput): Promise<Result<ResourceView>>;
+  updateNonIdentityData(input: UpdateNonIdentityDataInput): Promise<Result<ResourceView>>;
+  deactivateResource(input: DeactivateResourceInput): Promise<Result<ResourceView>>;
   getResource(input: { readonly resourceId: string }): Promise<Result<ResourceView>>;
   searchResources(input: {
     readonly terms: string;
+    readonly lifecycle?: ResourceLifecycleFilter;
     readonly limit?: number;
     readonly cursor?: string | null;
   }): Promise<Result<{ readonly items: ResourceSummary[]; readonly cursor: string | null }>>;

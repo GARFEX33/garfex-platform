@@ -149,6 +149,28 @@ const summary = (catalog: ResourceCatalog, resource: PersistedResource): Resourc
   };
 };
 
+const searchProjectionFor = (catalog: ResourceCatalog, resource: PersistedResource): string => {
+  const naturalUnit = catalog.naturalUnits.find((unit) => unit.code === resource.naturalUnitCode);
+  return normalizeSearchText(
+    [
+      catalog.classDefinition.code,
+      catalog.classDefinition.name,
+      catalog.family.code,
+      catalog.family.name,
+      catalog.type.code,
+      catalog.type.name,
+      resource.naturalUnitCode,
+      naturalUnit?.name ?? "",
+      describe(catalog, resource),
+      ...resource.attributes.flatMap((attribute) => [
+        attribute.attributeCode,
+        attribute.canonicalIdentity,
+        attribute.displayValue,
+      ]),
+    ].join(" "),
+  );
+};
+
 const decodeCursor = (cursor: string | null | undefined): number | null => {
   if (cursor === undefined || cursor === null) return 0;
   const match = /^v1:(\d+)$/.exec(cursor);
@@ -380,25 +402,7 @@ export const createResourceMaster = ({
           revision: 1,
           searchProjection: "",
         };
-        const currentDescription = describe(catalog, provisional);
-        const searchProjection = normalizeSearchText(
-          [
-            catalog.classDefinition.code,
-            catalog.classDefinition.name,
-            catalog.family.code,
-            catalog.family.name,
-            catalog.type.code,
-            catalog.type.name,
-            naturalUnit.code,
-            naturalUnit.name,
-            currentDescription,
-            ...persistedAttributes.flatMap((attribute) => [
-              attribute.attributeCode,
-              attribute.canonicalIdentity,
-              attribute.displayValue,
-            ]),
-          ].join(" "),
-        );
+        const searchProjection = searchProjectionFor(catalog, provisional);
         const resource = { ...provisional, searchProjection };
         const persisted = await repository.createIfIdentityAbsent(resource);
         if (persisted.kind === "DUPLICATE") {
@@ -417,6 +421,66 @@ export const createResourceMaster = ({
       }
     },
 
+    async updateNonIdentityData({ resourceId, expectedRevision, naturalUnitCode: rawUnit }) {
+      if (
+        typeof resourceId !== "string" ||
+        resourceId.length === 0 ||
+        !Number.isSafeInteger(expectedRevision) ||
+        expectedRevision < 0
+      ) {
+        return failure("INVALID_ARGUMENT", "resourceId and a non-negative revision are required");
+      }
+      if (typeof rawUnit !== "string" || rawUnit.trim().length === 0) {
+        return failure("VALIDATION", "naturalUnitCode is required");
+      }
+      const naturalUnitCode = normalizeCode(rawUnit);
+      const naturalUnit = catalog.naturalUnits.find((unit) => unit.code === naturalUnitCode);
+      if (
+        naturalUnit?.active !== true ||
+        !catalog.family.allowedNaturalUnitCodes.includes(naturalUnitCode)
+      ) {
+        return failure("INVALID_REFERENCE", "natural unit is inactive, missing, or not allowed");
+      }
+      const result = await repository.updateNaturalUnit({
+        resourceId,
+        expectedRevision,
+        naturalUnitCode,
+        searchProjection: (resource) => searchProjectionFor(catalog, resource),
+      });
+      if (result.kind === "UPDATED") return success(viewResource(result.resource));
+      if (result.kind === "CONFLICT") {
+        return failure("CONFLICT", "resource revision does not match", {
+          currentRevision: result.currentRevision,
+        });
+      }
+      if (result.kind === "INVALID_LIFECYCLE") {
+        return failure("INVALID_LIFECYCLE", "inactive resources cannot be updated");
+      }
+      return failure("NOT_FOUND", "resource not found");
+    },
+
+    async deactivateResource({ resourceId, expectedRevision }) {
+      if (
+        typeof resourceId !== "string" ||
+        resourceId.length === 0 ||
+        !Number.isSafeInteger(expectedRevision) ||
+        expectedRevision < 0
+      ) {
+        return failure("INVALID_ARGUMENT", "resourceId and a non-negative revision are required");
+      }
+      const result = await repository.deactivate({ resourceId, expectedRevision });
+      if (result.kind === "UPDATED") return success(viewResource(result.resource));
+      if (result.kind === "CONFLICT") {
+        return failure("CONFLICT", "resource revision does not match", {
+          currentRevision: result.currentRevision,
+        });
+      }
+      if (result.kind === "INVALID_LIFECYCLE") {
+        return failure("INVALID_LIFECYCLE", "resource is already inactive");
+      }
+      return failure("NOT_FOUND", "resource not found");
+    },
+
     async getResource({ resourceId }) {
       if (typeof resourceId !== "string" || resourceId.length === 0) {
         return failure("INVALID_ARGUMENT", "resourceId is required");
@@ -427,17 +491,20 @@ export const createResourceMaster = ({
         : success(viewResource(resource));
     },
 
-    async searchResources({ terms, limit = 20, cursor }) {
+    async searchResources({ terms, lifecycle = "ACTIVE", limit = 20, cursor }) {
       if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
         return failure("INVALID_ARGUMENT", "limit must be an integer from 1 to 50");
       }
       if (typeof terms !== "string" || normalizeSearchText(terms).length === 0) {
         return failure("INVALID_ARGUMENT", "at least one search term is required");
       }
+      if (!(["ACTIVE", "INACTIVE", "ALL"] as const).includes(lifecycle)) {
+        return failure("INVALID_ARGUMENT", "invalid lifecycle filter");
+      }
       const offset = decodeCursor(cursor);
       if (offset === null) return failure("INVALID_ARGUMENT", "invalid cursor");
       const tokens = normalizeSearchText(terms).split(" ");
-      const page = await repository.listActivePage({ offset, limit: 200 });
+      const page = await repository.listPage({ lifecycle, offset, limit: 200 });
       const matches = page.resources.filter((resource) =>
         tokens.every((token) =>
           resource.searchProjection.split(" ").some((candidate) => candidate.startsWith(token)),

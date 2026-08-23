@@ -24,7 +24,7 @@ export default defineSchema({
     naturalUnitCode: v.string(),
     canonicalIdentity: v.string(),
     identityPolicyVersion: v.literal("v1"),
-    active: v.literal(true),
+    active: v.boolean(),
     revision: v.number(),
     searchProjection: v.string(),
   })

@@ -115,7 +115,7 @@ export interface PersistedResource {
   readonly attributes: readonly PersistedAttribute[];
   readonly canonicalIdentity: string;
   readonly identityPolicyVersion: "v1";
-  readonly active: true;
+  readonly active: boolean;
   readonly revision: number;
   readonly searchProjection: string;
 }

@@ -36,12 +36,15 @@ const resourceError = v.object({
     v.literal("DUPLICATE"),
     v.literal("INVALID_REFERENCE"),
     v.literal("VALIDATION"),
+    v.literal("CONFLICT"),
+    v.literal("INVALID_LIFECYCLE"),
     v.literal("INTEGRITY"),
     v.literal("INTERNAL"),
   ),
   message: v.string(),
   details: v.optional(v.array(v.string())),
   existingResourceId: v.optional(v.string()),
+  currentRevision: v.optional(v.number()),
 });
 const failureResult = v.object({ ok: v.literal(false), error: resourceError });
 const taxonomy = v.array(
@@ -93,7 +96,7 @@ const resourceView = v.object({
   ),
   canonicalIdentity: v.string(),
   identityPolicyVersion: v.literal("v1"),
-  active: v.literal(true),
+  active: v.boolean(),
   revision: v.number(),
 });
 const resourceSummary = v.object({
@@ -168,6 +171,34 @@ export const createResource = mutation({
   },
 });
 
+export const updateNonIdentityData = mutation({
+  args: {
+    resourceId: v.string(),
+    expectedRevision: v.number(),
+    naturalUnitCode: v.string(),
+  },
+  returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
+  handler: async (ctx, args) => {
+    try {
+      return await createConvexMutationResourceMaster(ctx).updateNonIdentityData(args);
+    } catch {
+      return internalFailure();
+    }
+  },
+});
+
+export const deactivateResource = mutation({
+  args: { resourceId: v.string(), expectedRevision: v.number() },
+  returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
+  handler: async (ctx, args) => {
+    try {
+      return await createConvexMutationResourceMaster(ctx).deactivateResource(args);
+    } catch {
+      return internalFailure();
+    }
+  },
+});
+
 export const getResource = query({
   args: { resourceId: v.string() },
   returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
@@ -183,6 +214,7 @@ export const getResource = query({
 export const searchResources = query({
   args: {
     terms: v.string(),
+    lifecycle: v.optional(v.union(v.literal("ACTIVE"), v.literal("INACTIVE"), v.literal("ALL"))),
     limit: v.optional(v.number()),
     cursor: v.optional(v.union(v.string(), v.null())),
   },

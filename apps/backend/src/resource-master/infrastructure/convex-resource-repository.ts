@@ -84,6 +84,56 @@ export class ConvexResourceRepository implements ResourceRepository {
     return { kind: "CREATED" as const };
   }
 
+  async updateNaturalUnit({
+    resourceId,
+    expectedRevision,
+    naturalUnitCode,
+    searchProjection,
+  }: Parameters<ResourceRepository["updateNaturalUnit"]>[0]) {
+    if (this.writer === undefined) throw new Error("update requires a mutation transaction");
+    const header = await this.writer
+      .query("resources")
+      .withIndex("by_resource_id", (query) => query.eq("resourceId", resourceId))
+      .unique();
+    if (header === null) return { kind: "NOT_FOUND" as const };
+    if (header.revision !== expectedRevision) {
+      return { kind: "CONFLICT" as const, currentRevision: header.revision };
+    }
+    if (!header.active) return { kind: "INVALID_LIFECYCLE" as const };
+    const current = await reconstruct(this.writer, header);
+    if (header.naturalUnitCode === naturalUnitCode) {
+      return { kind: "UPDATED" as const, resource: current };
+    }
+    const next = { ...current, naturalUnitCode, revision: current.revision + 1 };
+    const updated = { ...next, searchProjection: searchProjection(next) };
+    await this.writer.patch(header._id, {
+      naturalUnitCode: updated.naturalUnitCode,
+      revision: updated.revision,
+      searchProjection: updated.searchProjection,
+    });
+    return { kind: "UPDATED" as const, resource: updated };
+  }
+
+  async deactivate({
+    resourceId,
+    expectedRevision,
+  }: Parameters<ResourceRepository["deactivate"]>[0]) {
+    if (this.writer === undefined) throw new Error("deactivate requires a mutation transaction");
+    const header = await this.writer
+      .query("resources")
+      .withIndex("by_resource_id", (query) => query.eq("resourceId", resourceId))
+      .unique();
+    if (header === null) return { kind: "NOT_FOUND" as const };
+    if (header.revision !== expectedRevision) {
+      return { kind: "CONFLICT" as const, currentRevision: header.revision };
+    }
+    if (!header.active) return { kind: "INVALID_LIFECYCLE" as const };
+    const revision = header.revision + 1;
+    await this.writer.patch(header._id, { active: false, revision });
+    const resource = await reconstruct(this.writer, { ...header, active: false, revision });
+    return { kind: "UPDATED" as const, resource };
+  }
+
   async getByResourceId(resourceId: string) {
     const header = await this.db
       .query("resources")
@@ -92,12 +142,21 @@ export class ConvexResourceRepository implements ResourceRepository {
     return header === null ? null : reconstruct(this.db, header);
   }
 
-  async listActivePage({ offset, limit }: { readonly offset: number; readonly limit: number }) {
-    const headers = await this.db
-      .query("resources")
-      .withIndex("by_active_resource_id", (query) => query.eq("active", true))
-      .order("asc")
-      .take(offset + limit + 1);
+  async listPage({ lifecycle, offset, limit }: Parameters<ResourceRepository["listPage"]>[0]) {
+    const headers =
+      lifecycle === "ALL"
+        ? await this.db
+            .query("resources")
+            .withIndex("by_resource_id")
+            .order("asc")
+            .take(offset + limit + 1)
+        : await this.db
+            .query("resources")
+            .withIndex("by_active_resource_id", (query) =>
+              query.eq("active", lifecycle === "ACTIVE"),
+            )
+            .order("asc")
+            .take(offset + limit + 1);
     const selected = headers.slice(offset, offset + limit);
     return {
       resources: await Promise.all(selected.map((header) => reconstruct(this.db, header))),
