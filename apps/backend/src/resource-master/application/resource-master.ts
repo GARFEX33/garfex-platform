@@ -25,10 +25,15 @@ import type {
   ResourceView,
   Result,
 } from "../public.js";
+import {
+  ResourceCatalogReadError,
+  type ResourceCatalogReadCode,
+  type ResourceCatalogReader,
+} from "./ports/resource-catalog-reader.js";
 import type { ResourceRepository } from "./ports/resource-repository.js";
 
 interface Dependencies {
-  readonly catalog: ResourceCatalog;
+  readonly catalogReader: ResourceCatalogReader;
   readonly repository: ResourceRepository;
   readonly createResourceId?: () => string;
 }
@@ -42,6 +47,12 @@ const failure = (
   ok: false,
   error: { code, message, ...extra },
 });
+const catalogFailureMessages: Record<ResourceCatalogReadCode, string> = {
+  RESOURCE_CATALOG_UNAVAILABLE: "resource catalog is unavailable",
+  RESOURCE_CATALOG_UNINITIALIZED: "resource catalog is uninitialized",
+  RESOURCE_CATALOG_INVALID: "resource catalog is invalid",
+};
+
 const viewResource = (resource: PersistedResource): ResourceView => ({
   resourceId: resource.resourceId,
   classCode: resource.classCode,
@@ -209,15 +220,27 @@ const decodeCursor = (
 };
 
 export const createResourceMaster = ({
-  catalog,
+  catalogReader,
   repository,
   createResourceId,
 }: Dependencies): ResourceMaster => {
-  const effectiveBindings = () =>
+  const effectiveBindings = (catalog: ResourceCatalog) =>
     resolveEffectiveBindings(catalog.bindings, catalog.family.code, catalog.type.code);
+  const withCatalog = async (): Promise<Result<ResourceCatalog>> => {
+    try {
+      return success((await catalogReader.loadSnapshot()).catalog);
+    } catch (error) {
+      const code: ResourceCatalogReadCode =
+        error instanceof ResourceCatalogReadError ? error.code : "RESOURCE_CATALOG_UNAVAILABLE";
+      return failure(code, catalogFailureMessages[code]);
+    }
+  };
 
   return {
     async getTaxonomy() {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
+      const catalog = catalogResult.value;
       return success([
         {
           code: catalog.classDefinition.code,
@@ -234,10 +257,13 @@ export const createResourceMaster = ({
     },
 
     async getEffectiveResourceSchema(input) {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
+      const catalog = catalogResult.value;
       if (!taxonomyIsValid(catalog, input))
         return failure("INVALID_REFERENCE", "unknown taxonomy path");
       try {
-        const attributes = effectiveBindings().flatMap((binding) => {
+        const attributes = effectiveBindings(catalog).flatMap((binding) => {
           const definition = catalog.attributes.find(
             (attribute) => attribute.code === binding.attributeCode,
           );
@@ -266,12 +292,15 @@ export const createResourceMaster = ({
     },
 
     async getValidOptions({ attributeCode }) {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
+      const catalog = catalogResult.value;
       const attribute = catalog.attributes.find(
         (candidate) => candidate.code === attributeCode && candidate.active,
       );
       if (attribute === undefined) return failure("NOT_FOUND", "attribute not found");
       try {
-        const binding = effectiveBindings().find(
+        const binding = effectiveBindings(catalog).find(
           (candidate) => candidate.attributeCode === attribute.code,
         );
         if (binding === undefined) return failure("NOT_FOUND", "attribute is not applicable");
@@ -293,6 +322,9 @@ export const createResourceMaster = ({
     },
 
     async getNaturalUnits({ familyCode }) {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
+      const catalog = catalogResult.value;
       if (familyCode !== catalog.family.code || !catalog.family.active) {
         return failure("INVALID_REFERENCE", "family not found");
       }
@@ -311,6 +343,9 @@ export const createResourceMaster = ({
     },
 
     async createResource(input) {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
+      const catalog = catalogResult.value;
       try {
         const codes = {
           classCode: normalizeCode(input.classCode),
@@ -342,7 +377,7 @@ export const createResourceMaster = ({
           return failure("VALIDATION", "unknown attributes", { details: unknown.sort() });
         }
 
-        const bindings = effectiveBindings();
+        const bindings = effectiveBindings(catalog);
         const bindingByAttribute = new Map(
           bindings.map((binding) => [binding.attributeCode, binding] as const),
         );
@@ -451,6 +486,9 @@ export const createResourceMaster = ({
     },
 
     async updateNonIdentityData({ resourceId, expectedRevision, naturalUnitCode: rawUnit }) {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
+      const catalog = catalogResult.value;
       if (
         typeof resourceId !== "string" ||
         resourceId.length === 0 ||
@@ -489,6 +527,8 @@ export const createResourceMaster = ({
     },
 
     async deactivateResource({ resourceId, expectedRevision }) {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
       if (
         typeof resourceId !== "string" ||
         resourceId.length === 0 ||
@@ -511,6 +551,8 @@ export const createResourceMaster = ({
     },
 
     async getResource({ resourceId }) {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
       if (typeof resourceId !== "string" || resourceId.length === 0) {
         return failure("INVALID_ARGUMENT", "resourceId is required");
       }
@@ -521,6 +563,9 @@ export const createResourceMaster = ({
     },
 
     async searchResources({ terms, lifecycle = "ACTIVE", limit = 20, cursor }) {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
+      const catalog = catalogResult.value;
       if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
         return failure("INVALID_ARGUMENT", "limit must be an integer from 1 to 50");
       }
@@ -570,6 +615,9 @@ export const createResourceMaster = ({
     },
 
     async describeResource({ resourceId }) {
+      const catalogResult = await withCatalog();
+      if (!catalogResult.ok) return catalogResult;
+      const catalog = catalogResult.value;
       const resource = await repository.getByResourceId(resourceId);
       if (resource === null) return failure("NOT_FOUND", "resource not found");
       return success({ resourceId, description: describe(catalog, resource) });

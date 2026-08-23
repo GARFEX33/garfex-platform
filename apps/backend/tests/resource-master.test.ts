@@ -3,6 +3,10 @@ import { createResourceMaster } from "../src/resource-master/application/resourc
 import { cableCatalog } from "../src/resource-master/infrastructure/cable-catalog.js";
 import { InMemoryResourceRepository } from "../src/resource-master/infrastructure/in-memory-resource-repository.js";
 import type { PersistedResource } from "../src/resource-master/domain/types.js";
+import {
+  InMemoryResourceCatalogReader,
+  validResourceCatalogSnapshot,
+} from "./support/in-memory-resource-catalog.js";
 
 const valid = {
   classCode: "MATERIAL",
@@ -22,7 +26,7 @@ const setup = () => {
   let sequence = 0;
   const repository = new InMemoryResourceRepository();
   const master = createResourceMaster({
-    catalog: cableCatalog,
+    catalogReader: new InMemoryResourceCatalogReader(),
     repository,
     createResourceId: () => `00000000-0000-4000-8000-${String(++sequence).padStart(12, "0")}`,
   });
@@ -150,7 +154,10 @@ describe("Resource Master application", () => {
         [duplicate, original, ...remaining],
       ].map((bindings) =>
         createResourceMaster({
-          catalog: { ...cableCatalog, bindings },
+          catalogReader: new InMemoryResourceCatalogReader("valid", {
+            ...validResourceCatalogSnapshot,
+            catalog: { ...validResourceCatalogSnapshot.catalog, bindings },
+          }),
           repository: new InMemoryResourceRepository(),
         }).getEffectiveResourceSchema({
           classCode: "MATERIAL",
@@ -426,7 +433,10 @@ describe("Resource Master application", () => {
       };
     });
     await Promise.all(resources.map((resource) => repository.createIfIdentityAbsent(resource)));
-    const master = createResourceMaster({ catalog: cableCatalog, repository });
+    const master = createResourceMaster({
+      catalogReader: new InMemoryResourceCatalogReader(),
+      repository,
+    });
 
     const ids: string[] = [];
     let cursor: string | null = null;
