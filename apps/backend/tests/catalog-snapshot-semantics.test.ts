@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ResourceCatalogValidationError } from "../src/resource-master/domain/catalog-snapshot-foundation.js";
 import { parseResourceCatalogSemantics } from "../src/resource-master/domain/catalog-snapshot-semantics.js";
-import { cableCatalog } from "./fixtures/cable-catalog.js";
 import type { ResourceCatalog } from "../src/resource-master/domain/types.js";
+import { cableCatalog } from "./fixtures/cable-catalog.js";
 
 const at = <T>(items: readonly T[], index: number, change: (item: T) => T) =>
   items.map((item, candidate) => (candidate === index ? change(item) : item));
@@ -48,7 +48,7 @@ describe("resource catalog semantic validation", () => {
         ...cableCatalog,
         optionSets: at(cableCatalog.optionSets, 0, (item) => ({
           ...item,
-          options: [...item.options, item.options[0]!],
+          options: item.options[0] ? [...item.options, item.options[0]] : item.options,
         })),
       },
       { ...cableCatalog, naturalUnits: [...cableCatalog.naturalUnits, unit] },
@@ -57,7 +57,7 @@ describe("resource catalog semantic validation", () => {
         ...cableCatalog,
         bindings: where(cableCatalog.bindings, "color", (item) => ({
           ...item,
-          rules: [...item.rules, item.rules[0]!],
+          rules: item.rules[0] ? [...item.rules, item.rules[0]] : item.rules,
         })),
       },
       {
