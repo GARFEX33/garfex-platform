@@ -1,0 +1,37 @@
+schema: spec-driven
+
+context: |
+  Project: GARFEX platform (garfex-platform), a public GitHub repository using a pnpm workspace with the Resource Master v2 Cable backend in apps/backend.
+  Stack: Node >=24.19.0 <25, pnpm >=11 <12 (packageManager pnpm@11.0.0), TypeScript 5.9.3 with strict NodeNext ESM, Convex 1.45.0, Vitest 4.1.11, Biome 2.5.10, and convex-test with edge-runtime.
+  Architecture: Public capability -> Application use case -> Domain rules and Application-owned ports -> Infrastructure adapters; Convex functions validate transport values and compose through Infrastructure. Domain and Application remain framework-neutral, and Convex generated/platform types stay at the adapter edge.
+  Conventions: noUncheckedIndexedAccess, exactOptionalPropertyTypes, verbatimModuleSyntax, isolatedModules, composite references, object-form Convex functions with explicit validators, indexed/bounded reads, and architecture checks under tooling/architecture.
+  Verification: corepack pnpm test; corepack pnpm --filter @garfex/backend test; corepack pnpm --filter @garfex/backend typecheck; corepack pnpm test:architecture; corepack pnpm build; and corepack pnpm check.
+  Active SDD session: change persistent-resource-catalog; executionMode: auto; artifactStore: both (OpenSpec and Engram); chainedPrStrategy: auto-forecast; reviewBudgetLines: 400; engramAvailable: true.
+  Provenance: approved SDD artifacts originate from Engram observations 1555-1565 and 1567; corrected Judgment Day SHA-256 is d993849a08e29745891f0bb7739f3114928b86f76fc35853334a729fecb1cd7b.
+
+strict_tdd: true
+
+rules:
+  proposal:
+    require_problem_statement: true
+  spec:
+    require_acceptance_criteria: true
+  design:
+    require_tradeoffs: true
+  tasks:
+    protect_review_workload: true
+  apply:
+    tdd: true
+    test_command: "corepack pnpm test"
+  verify:
+    test_command: "corepack pnpm test"
+    build_command: "corepack pnpm build"
+    coverage_threshold: 0
+  archive:
+    - Preserve an auditable record of deviations and unexecuted checks.
+
+testing:
+  detected: "2026-08-23"
+  runner:
+    command: "corepack pnpm test"
+    framework: "Vitest 4.1.11"
