@@ -26,6 +26,7 @@ pnpm check
 | `tooling/architecture-fixtures/` | Controlled valid and invalid graphs used to prove the checks. |
 | `docs/architecture.md` | Current layer rules and the shape required for future modules. |
 | `docs/auth-boundary.md` | Approved provider-neutral auth boundary and staged plan for the upcoming internal UI. |
+| `docs/surface-ui-harness-boundary.md` | Accepted separation of human-facing Surface/UI and agent Harness roles. |
 
 ## Work with the backend
 
