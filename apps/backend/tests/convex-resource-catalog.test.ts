@@ -307,4 +307,208 @@ describe("Convex persistent Resource Catalog", () => {
     const current = await t.run((ctx) => new ConvexResourceCatalogReader(ctx.db).loadSnapshot());
     expect(current).toEqual(snapshot);
   });
+
+  it("compares every semantic section without ignoring meaningful order", () => {
+    const variants = [
+      {
+        label: "class name",
+        candidate: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            classDefinition: { ...payload.catalog.classDefinition, name: "Materiales" },
+          },
+        },
+      },
+      {
+        label: "family name",
+        candidate: replacement("Conductores v2"),
+      },
+      {
+        label: "type name",
+        candidate: {
+          ...payload,
+          catalog: { ...payload.catalog, type: { ...payload.catalog.type, name: "Cable v2" } },
+        },
+      },
+      {
+        label: "attribute meaning",
+        candidate: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            attributes: payload.catalog.attributes.map((attribute) =>
+              attribute.code === "gauge" ? { ...attribute, meaning: "AWG v2" } : attribute,
+            ),
+          },
+        },
+      },
+      {
+        label: "option label",
+        candidate: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            optionSets: payload.catalog.optionSets.map((set) =>
+              set.code === "COLOR"
+                ? {
+                    ...set,
+                    options: set.options.map((option) =>
+                      option.code === "ROJO" ? { ...option, label: "Rojo intenso" } : option,
+                    ),
+                  }
+                : set,
+            ),
+          },
+        },
+      },
+      {
+        label: "option active lifecycle",
+        candidate: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            optionSets: payload.catalog.optionSets.map((set) =>
+              set.code === "CONDUCTOR_MATERIAL"
+                ? {
+                    ...set,
+                    options: set.options.map((option) =>
+                      option.code === "ALUMINIO" ? { ...option, active: false } : option,
+                    ),
+                  }
+                : set,
+            ),
+          },
+        },
+      },
+      {
+        label: "natural-unit name",
+        candidate: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            naturalUnits: payload.catalog.naturalUnits.map((unit) =>
+              unit.code === "ROLLO" ? { ...unit, name: "Rollo v2" } : unit,
+            ),
+          },
+        },
+      },
+      {
+        label: "binding default",
+        candidate: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            bindings: payload.catalog.bindings.map((binding) =>
+              binding.attributeCode === "gauge"
+                ? {
+                    ...binding,
+                    defaultResult: { mode: "OPTIONAL" as const, identity: false },
+                  }
+                : binding,
+            ),
+          },
+        },
+      },
+      {
+        label: "rule result",
+        candidate: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            bindings: payload.catalog.bindings.map((binding) =>
+              binding.attributeCode === "color"
+                ? {
+                    ...binding,
+                    rules: binding.rules.map((rule) => ({
+                      ...rule,
+                      result: { mode: "OPTIONAL" as const, identity: false },
+                    })),
+                  }
+                : binding,
+            ),
+          },
+        },
+      },
+      {
+        label: "presentation order",
+        candidate: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            attributes: [...payload.catalog.attributes].reverse(),
+          },
+        },
+      },
+      {
+        label: "presentation metadata",
+        candidate: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            presentation: { ...payload.catalog.presentation, includeNaturalUnit: true },
+          },
+        },
+      },
+    ] as const;
+    for (const { label, candidate } of variants) {
+      expect(resourceCatalogPayloadEquals(payload, candidate), label).toBe(false);
+    }
+    expect(resourceCatalogSnapshotEquals(snapshot, { ...snapshot, revision: 2 })).toBe(false);
+  });
+
+  it("records the measured payload headroom and rejects all conservative bound overflows", () => {
+    const measured = measureResourceCatalog(cableCatalogV1);
+    expect(measured).toEqual({ bytes: 3317, depth: 8, largestArray: 5, largestObject: 9 });
+    expect(resourceCatalogBounds.maxBytes - measured.bytes).toBe(764683);
+    expect(resourceCatalogBounds.maxDepth - measured.depth).toBe(4);
+    expect(resourceCatalogBounds.maxArrayLength - measured.largestArray).toBe(4091);
+    expect(resourceCatalogBounds.maxObjectFields - measured.largestObject).toBe(503);
+
+    const deepValue = Array.from({ length: 12 }).reduce<unknown>((value) => [value], "x");
+    const oversized = [
+      {
+        label: "encoded source version",
+        value: { ...payload, sourceVersion: "x".repeat(129) },
+      },
+      {
+        label: "nested depth",
+        value: { ...payload, catalog: { ...payload.catalog, unexpected: deepValue } },
+      },
+      {
+        label: "array length",
+        value: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            attributes: Array.from(
+              { length: resourceCatalogBounds.maxArrayLength + 1 },
+              () => payload.catalog.attributes[0],
+            ),
+          },
+        },
+      },
+      {
+        label: "object field count",
+        value: {
+          ...payload,
+          catalog: {
+            ...payload.catalog,
+            classDefinition: {
+              ...payload.catalog.classDefinition,
+              ...Object.fromEntries(
+                Array.from({ length: resourceCatalogBounds.maxObjectFields }, (_, index) => [
+                  `unexpected${index}`,
+                  index,
+                ]),
+              ),
+            },
+          },
+        },
+      },
+    ];
+    for (const { label, value } of oversized) {
+      expect(() => parseResourceCatalogPayload(value), label).toThrow();
+    }
+  });
 });
