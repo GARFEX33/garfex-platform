@@ -2,6 +2,12 @@ import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api, internal } from "../convex/_generated/api.js";
 import schema from "../convex/schema.js";
+import {
+  createConvexMutationResourceMaster,
+  createConvexQueryResourceMaster,
+} from "../src/resource-master/infrastructure/convex-resource-master.js";
+import { ConvexResourceCatalogInstaller } from "../src/resource-master/infrastructure/convex-resource-catalog.js";
+import { cableCatalogV1 } from "../src/resource-master/deployment/cable-catalog-v1.js";
 
 const modules = (
   import.meta as ImportMeta & {
@@ -28,6 +34,76 @@ const seededTest = async () => {
     expectedRevision: 0,
   });
   return t;
+};
+
+const messages = {
+  RESOURCE_CATALOG_UNAVAILABLE: "resource catalog is unavailable",
+  RESOURCE_CATALOG_UNINITIALIZED: "resource catalog is uninitialized",
+  RESOURCE_CATALOG_INVALID: "resource catalog is invalid",
+} as const;
+
+const catalogOperations = (t: Awaited<ReturnType<typeof seededTest>>) =>
+  [
+    { name: "getTaxonomy", invoke: () => t.query(api.resourceMaster.getTaxonomy, {}) },
+    {
+      name: "getEffectiveResourceSchema",
+      invoke: () =>
+        t.query(api.resourceMaster.getEffectiveResourceSchema, {
+          classCode: valid.classCode,
+          familyCode: valid.familyCode,
+          typeCode: valid.typeCode,
+        }),
+    },
+    {
+      name: "getValidOptions",
+      invoke: () => t.query(api.resourceMaster.getValidOptions, { attributeCode: "insulation" }),
+    },
+    {
+      name: "getNaturalUnits",
+      invoke: () => t.query(api.resourceMaster.getNaturalUnits, { familyCode: "CONDUCTORES" }),
+    },
+    { name: "createResource", invoke: () => t.mutation(api.resourceMaster.createResource, valid) },
+    {
+      name: "updateNonIdentityData",
+      invoke: () =>
+        t.mutation(api.resourceMaster.updateNonIdentityData, {
+          resourceId: "missing",
+          expectedRevision: 1,
+          naturalUnitCode: "M",
+        }),
+    },
+    {
+      name: "getResource",
+      invoke: () => t.query(api.resourceMaster.getResource, { resourceId: "missing" }),
+    },
+    {
+      name: "deactivateResource",
+      invoke: () =>
+        t.mutation(api.resourceMaster.deactivateResource, {
+          resourceId: "missing",
+          expectedRevision: 1,
+        }),
+    },
+    {
+      name: "searchResources",
+      invoke: () => t.query(api.resourceMaster.searchResources, { terms: "cab", limit: 10 }),
+    },
+    {
+      name: "describeResource",
+      invoke: () => t.query(api.resourceMaster.describeResource, { resourceId: "missing" }),
+    },
+  ] as const;
+
+const expectCatalogFailure = async (
+  t: Awaited<ReturnType<typeof seededTest>>,
+  code: keyof typeof messages,
+) => {
+  for (const operation of catalogOperations(t)) {
+    expect(await operation.invoke(), operation.name).toEqual({
+      ok: false,
+      error: { code, message: messages[code] },
+    });
+  }
 };
 
 describe("Convex Resource Master adapter", () => {
@@ -79,6 +155,146 @@ describe("Convex Resource Master adapter", () => {
       value: [{ families: [{ name: "Persisted" }] }],
     });
     expect(await t.mutation(api.resourceMaster.createResource, valid)).toMatchObject({ ok: true });
+  });
+
+  it("fails closed for an absent catalog across all ten entrypoints", async () => {
+    const t = convexTest(schema, modules);
+    expect("resourceCatalogBootstrap" in api).toBe(false);
+    await expectCatalogFailure(t, "RESOURCE_CATALOG_UNINITIALIZED");
+  });
+
+  it("fails closed for empty and invalid persisted catalog documents", async () => {
+    const empty = convexTest(schema, modules);
+    await empty.run((ctx) =>
+      ctx.db.insert("resourceCatalogSnapshots", {
+        ...cableCatalogV1,
+        revision: 1,
+        catalog: {
+          ...cableCatalogV1.catalog,
+          attributes: [],
+          optionSets: [],
+          naturalUnits: [],
+          bindings: [],
+          presentation: { attributeOrder: [], includeNaturalUnit: false },
+        },
+      } as never),
+    );
+    await expectCatalogFailure(empty, "RESOURCE_CATALOG_UNINITIALIZED");
+
+    const invalid = convexTest(schema, modules);
+    await invalid.run((ctx) =>
+      ctx.db.insert("resourceCatalogSnapshots", {
+        ...cableCatalogV1,
+        revision: 1,
+        catalog: {
+          ...cableCatalogV1.catalog,
+          family: { ...cableCatalogV1.catalog.family, classCode: "wrong" },
+        },
+      } as never),
+    );
+    await expectCatalogFailure(invalid, "RESOURCE_CATALOG_INVALID");
+  });
+
+  it("maps Convex reader unavailability for every composed entrypoint", async () => {
+    const db = {
+      query: () => {
+        throw new Error("storage secret");
+      },
+    };
+    const queryMaster = createConvexQueryResourceMaster({ db } as never);
+    const mutationMaster = createConvexMutationResourceMaster({ db } as never);
+    const operations = [
+      { name: "getTaxonomy", invoke: () => queryMaster.getTaxonomy() },
+      {
+        name: "getEffectiveResourceSchema",
+        invoke: () => queryMaster.getEffectiveResourceSchema(valid),
+      },
+      {
+        name: "getValidOptions",
+        invoke: () => queryMaster.getValidOptions({ attributeCode: "insulation" }),
+      },
+      {
+        name: "getNaturalUnits",
+        invoke: () => queryMaster.getNaturalUnits({ familyCode: "CONDUCTORES" }),
+      },
+      { name: "createResource", invoke: () => mutationMaster.createResource(valid) },
+      {
+        name: "updateNonIdentityData",
+        invoke: () =>
+          mutationMaster.updateNonIdentityData({
+            resourceId: "missing",
+            expectedRevision: 1,
+            naturalUnitCode: "M",
+          }),
+      },
+      { name: "getResource", invoke: () => queryMaster.getResource({ resourceId: "missing" }) },
+      {
+        name: "deactivateResource",
+        invoke: () =>
+          mutationMaster.deactivateResource({ resourceId: "missing", expectedRevision: 1 }),
+      },
+      {
+        name: "searchResources",
+        invoke: () => queryMaster.searchResources({ terms: "cab", limit: 10 }),
+      },
+      {
+        name: "describeResource",
+        invoke: () => queryMaster.describeResource({ resourceId: "missing" }),
+      },
+    ];
+    for (const operation of operations) {
+      expect(await operation.invoke(), operation.name).toEqual({
+        ok: false,
+        error: {
+          code: "RESOURCE_CATALOG_UNAVAILABLE",
+          message: messages.RESOURCE_CATALOG_UNAVAILABLE,
+        },
+      });
+    }
+  });
+
+  it("keeps stable resource identity and attribute hydration across catalog replacement", async () => {
+    const t = await seededTest();
+    const created = await t.mutation(api.resourceMaster.createResource, valid);
+    if (!created.ok) throw new Error("expected create success");
+    const replacement = {
+      ...cableCatalogV1,
+      catalog: {
+        ...cableCatalogV1.catalog,
+        family: { ...cableCatalogV1.catalog.family, name: "Conductores v2" },
+      },
+    };
+    expect(
+      await t.run((ctx) =>
+        new ConvexResourceCatalogInstaller(ctx.db).install({
+          expectedRevision: 1,
+          candidate: replacement,
+        }),
+      ),
+    ).toMatchObject({ kind: "INSTALLED", snapshot: { revision: 2 } });
+    expect(
+      await t.query(api.resourceMaster.getResource, { resourceId: created.value.resourceId }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        resourceId: created.value.resourceId,
+        canonicalIdentity: created.value.canonicalIdentity,
+      },
+    });
+    expect(
+      await t.query(api.resourceMaster.searchResources, { terms: "cab cobre", limit: 10 }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        items: [
+          expect.objectContaining({
+            resourceId: created.value.resourceId,
+            familyName: "Conductores v2",
+            values: expect.arrayContaining(["12"]),
+          }),
+        ],
+      },
+    });
   });
 
   it("persists header and attributes atomically and rejects indexed duplicates", async () => {

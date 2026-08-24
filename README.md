@@ -72,3 +72,18 @@ additional business modules, UI/API transports beyond Convex functions, authenti
 Temporal workflows, agent integrations, and production deployment automation are explicitly
 deferred. Authentication is not implemented; its approved boundary must be enforced before the
 internal UI or externally reachable managed mutations are introduced.
+
+## Persistent Resource Catalog authority
+
+The production catalog is one `resourceCatalogSnapshots` Convex aggregate under `resource-master`.
+Application owns the pure `ResourceCatalogReader` port; the deployment-only complete-snapshot installer
+is internal and is not exported through `public.ts`, clients, or UI. Each query and mutation creates a
+fresh Convex reader, loads one indexed bounded snapshot (`take(2)`), and reuses it for the operation.
+There is no process cache, catalog fallback, dual read/write, or Resource Search hydration refactor.
+
+Deployment payloads and test fixtures are independent copies: the payload is write input only, the
+fixture is test-only, and runtime reads only the persisted Convex document. Cutover is staged, rehearsed
+on a named non-production deployment with `convex run ... --deployment <target>`, then released only
+with explicit human authorization for any production target. After cutover, application rollback is
+to a compatible Convex-backed release; catalog recovery uses a previously verified payload through the
+internal OCC installer. Fixture restoration and fallback are never rollback options.
