@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { createResourceMaster } from "../src/resource-master/application/resource-master.js";
+import type { ResourceRepository } from "../src/resource-master/application/ports/resource-repository.js";
+import type { ActorId } from "../src/resource-master/public.js";
 import {
   createAuthenticationComposition,
   createConfiguredAuthenticationComposition,
@@ -9,6 +12,11 @@ import {
   LOCAL_DEVELOPMENT_ACTOR_ID,
   localDevelopmentCapabilities,
 } from "../src/auth/local-development-identity-adapter.js";
+
+const forbidden = {
+  ok: false,
+  error: { code: "FORBIDDEN", message: "operation is not permitted" },
+} as const;
 
 const unauthenticated = {
   ok: false,
@@ -123,5 +131,22 @@ describe("authentication composition and edge", () => {
 
     expect(await invokeAuthenticatedResourceMasterOperation(null, invoke)).toEqual(unauthenticated);
     expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("keeps an authenticated but insufficient actor FORBIDDEN", async () => {
+    const composition = createAuthenticationComposition(
+      { resolveActorId: async () => "garfex-actor:viewer" as ActorId },
+      capabilitiesForRole("Viewer"),
+    );
+    const master = createResourceMaster({
+      catalogReader: { loadSnapshot: vi.fn() },
+      repository: {} as ResourceRepository,
+    });
+
+    expect(
+      await invokeAuthenticatedResourceMasterOperation(composition, (context) =>
+        master.createResource(context, {} as never),
+      ),
+    ).toEqual(forbidden);
   });
 });

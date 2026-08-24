@@ -8,6 +8,10 @@ import {
 } from "../src/resource-master/infrastructure/convex-resource-master.js";
 import { ConvexResourceCatalogInstaller } from "../src/resource-master/infrastructure/convex-resource-catalog.js";
 import { cableCatalogV1 } from "../src/resource-master/deployment/cable-catalog-v1.js";
+import { authorizeResourceMasterForTest } from "./support/authorized-resource-master.js";
+
+process.env.GARFEX_RUNTIME_ENV = "local-development";
+process.env.GARFEX_AUTH_MODE = "local-development";
 
 const modules = (
   import.meta as ImportMeta & {
@@ -107,6 +111,35 @@ const expectCatalogFailure = async (
 };
 
 describe("Convex Resource Master adapter", () => {
+  it.each([
+    [undefined, "local-development"],
+    ["local-development", undefined],
+    ["production", "local-development"],
+    ["local-development", "production"],
+  ] as const)(
+    "returns UNAUTHENTICATED before catalog work for runtime %s and auth mode %s",
+    async (runtimeEnvironment, authMode) => {
+      const configuredRuntimeEnvironment = process.env.GARFEX_RUNTIME_ENV;
+      const configuredAuthMode = process.env.GARFEX_AUTH_MODE;
+      if (runtimeEnvironment === undefined) delete process.env.GARFEX_RUNTIME_ENV;
+      else process.env.GARFEX_RUNTIME_ENV = runtimeEnvironment;
+      if (authMode === undefined) delete process.env.GARFEX_AUTH_MODE;
+      else process.env.GARFEX_AUTH_MODE = authMode;
+      try {
+        const t = convexTest(schema, modules);
+        expect(await t.query(api.resourceMaster.getTaxonomy, {})).toEqual({
+          ok: false,
+          error: { code: "UNAUTHENTICATED", message: "authentication is required" },
+        });
+      } finally {
+        if (configuredRuntimeEnvironment === undefined) delete process.env.GARFEX_RUNTIME_ENV;
+        else process.env.GARFEX_RUNTIME_ENV = configuredRuntimeEnvironment;
+        if (configuredAuthMode === undefined) delete process.env.GARFEX_AUTH_MODE;
+        else process.env.GARFEX_AUTH_MODE = configuredAuthMode;
+      }
+    },
+  );
+
   it("rejects client-supplied identity and authorization fields at the transport validator", async () => {
     const t = await seededTest();
     await expect(
@@ -216,8 +249,12 @@ describe("Convex Resource Master adapter", () => {
         throw new Error("storage secret");
       },
     };
-    const queryMaster = createConvexQueryResourceMaster({ db } as never);
-    const mutationMaster = createConvexMutationResourceMaster({ db } as never);
+    const queryMaster = authorizeResourceMasterForTest(
+      createConvexQueryResourceMaster({ db } as never),
+    );
+    const mutationMaster = authorizeResourceMasterForTest(
+      createConvexMutationResourceMaster({ db } as never),
+    );
     const operations = [
       { name: "getTaxonomy", invoke: () => queryMaster.getTaxonomy() },
       {

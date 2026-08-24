@@ -4,6 +4,14 @@ import {
   createConvexMutationResourceMaster,
   createConvexQueryResourceMaster,
 } from "../src/resource-master/infrastructure/convex-resource-master.js";
+import { createConfiguredAuthenticationComposition } from "../src/auth/composition.js";
+import { invokeAuthenticatedResourceMasterOperation } from "../src/auth/resource-master-edge.js";
+
+const authenticationComposition = () =>
+  createConfiguredAuthenticationComposition({
+    runtimeEnvironment: process.env.GARFEX_RUNTIME_ENV,
+    authMode: process.env.GARFEX_AUTH_MODE,
+  });
 
 const taxonomyArgs = {
   classCode: v.string(),
@@ -132,26 +140,37 @@ const internalFailure = () => ({
 export const getTaxonomy = query({
   args: {},
   returns: v.union(v.object({ ok: v.literal(true), value: taxonomy }), failureResult),
-  handler: async (ctx) => createConvexQueryResourceMaster(ctx).getTaxonomy(),
+  handler: async (ctx) =>
+    invokeAuthenticatedResourceMasterOperation(authenticationComposition(), (actor) =>
+      createConvexQueryResourceMaster(ctx).getTaxonomy(actor),
+    ),
 });
 
 export const getEffectiveResourceSchema = query({
   args: taxonomyArgs,
   returns: v.union(v.object({ ok: v.literal(true), value: effectiveSchema }), failureResult),
   handler: async (ctx, args) =>
-    createConvexQueryResourceMaster(ctx).getEffectiveResourceSchema(args),
+    invokeAuthenticatedResourceMasterOperation(authenticationComposition(), (actor) =>
+      createConvexQueryResourceMaster(ctx).getEffectiveResourceSchema(actor, args),
+    ),
 });
 
 export const getValidOptions = query({
   args: { attributeCode: v.string() },
   returns: v.union(v.object({ ok: v.literal(true), value: optionList }), failureResult),
-  handler: async (ctx, args) => createConvexQueryResourceMaster(ctx).getValidOptions(args),
+  handler: async (ctx, args) =>
+    invokeAuthenticatedResourceMasterOperation(authenticationComposition(), (actor) =>
+      createConvexQueryResourceMaster(ctx).getValidOptions(actor, args),
+    ),
 });
 
 export const getNaturalUnits = query({
   args: { familyCode: v.string() },
   returns: v.union(v.object({ ok: v.literal(true), value: naturalUnits }), failureResult),
-  handler: async (ctx, args) => createConvexQueryResourceMaster(ctx).getNaturalUnits(args),
+  handler: async (ctx, args) =>
+    invokeAuthenticatedResourceMasterOperation(authenticationComposition(), (actor) =>
+      createConvexQueryResourceMaster(ctx).getNaturalUnits(actor, args),
+    ),
 });
 
 export const createResource = mutation({
@@ -169,7 +188,10 @@ export const createResource = mutation({
   returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
   handler: async (ctx, args) => {
     try {
-      return await createConvexMutationResourceMaster(ctx).createResource(args);
+      return await invokeAuthenticatedResourceMasterOperation(
+        authenticationComposition(),
+        (actor) => createConvexMutationResourceMaster(ctx).createResource(actor, args),
+      );
     } catch {
       return internalFailure();
     }
@@ -185,7 +207,10 @@ export const updateNonIdentityData = mutation({
   returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
   handler: async (ctx, args) => {
     try {
-      return await createConvexMutationResourceMaster(ctx).updateNonIdentityData(args);
+      return await invokeAuthenticatedResourceMasterOperation(
+        authenticationComposition(),
+        (actor) => createConvexMutationResourceMaster(ctx).updateNonIdentityData(actor, args),
+      );
     } catch {
       return internalFailure();
     }
@@ -197,7 +222,10 @@ export const deactivateResource = mutation({
   returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
   handler: async (ctx, args) => {
     try {
-      return await createConvexMutationResourceMaster(ctx).deactivateResource(args);
+      return await invokeAuthenticatedResourceMasterOperation(
+        authenticationComposition(),
+        (actor) => createConvexMutationResourceMaster(ctx).deactivateResource(actor, args),
+      );
     } catch {
       return internalFailure();
     }
@@ -209,7 +237,10 @@ export const getResource = query({
   returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
   handler: async (ctx, args) => {
     try {
-      return await createConvexQueryResourceMaster(ctx).getResource(args);
+      return await invokeAuthenticatedResourceMasterOperation(
+        authenticationComposition(),
+        (actor) => createConvexQueryResourceMaster(ctx).getResource(actor, args),
+      );
     } catch {
       return internalFailure();
     }
@@ -226,7 +257,10 @@ export const searchResources = query({
   returns: v.union(v.object({ ok: v.literal(true), value: searchPage }), failureResult),
   handler: async (ctx, args) => {
     try {
-      return await createConvexQueryResourceMaster(ctx).searchResources(args);
+      return await invokeAuthenticatedResourceMasterOperation(
+        authenticationComposition(),
+        (actor) => createConvexQueryResourceMaster(ctx).searchResources(actor, args),
+      );
     } catch {
       return internalFailure();
     }
@@ -238,7 +272,10 @@ export const describeResource = query({
   returns: v.union(v.object({ ok: v.literal(true), value: description }), failureResult),
   handler: async (ctx, args) => {
     try {
-      return await createConvexQueryResourceMaster(ctx).describeResource(args);
+      return await invokeAuthenticatedResourceMasterOperation(
+        authenticationComposition(),
+        (actor) => createConvexQueryResourceMaster(ctx).describeResource(actor, args),
+      );
     } catch {
       return internalFailure();
     }

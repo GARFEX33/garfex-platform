@@ -7,6 +7,7 @@ import {
   InMemoryResourceCatalogReader,
   validResourceCatalogSnapshot,
 } from "./support/in-memory-resource-catalog.js";
+import { authorizeResourceMasterForTest } from "./support/authorized-resource-master.js";
 
 const valid = {
   classCode: "MATERIAL",
@@ -25,11 +26,13 @@ const valid = {
 const setup = () => {
   let sequence = 0;
   const repository = new InMemoryResourceRepository();
-  const master = createResourceMaster({
-    catalogReader: new InMemoryResourceCatalogReader(),
-    repository,
-    createResourceId: () => `00000000-0000-4000-8000-${String(++sequence).padStart(12, "0")}`,
-  });
+  const master = authorizeResourceMasterForTest(
+    createResourceMaster({
+      catalogReader: new InMemoryResourceCatalogReader(),
+      repository,
+      createResourceId: () => `00000000-0000-4000-8000-${String(++sequence).padStart(12, "0")}`,
+    }),
+  );
   return { master, repository };
 };
 
@@ -153,13 +156,15 @@ describe("Resource Master application", () => {
         [original, duplicate, ...remaining],
         [duplicate, original, ...remaining],
       ].map((bindings) =>
-        createResourceMaster({
-          catalogReader: new InMemoryResourceCatalogReader("valid", {
-            ...validResourceCatalogSnapshot,
-            catalog: { ...validResourceCatalogSnapshot.catalog, bindings },
+        authorizeResourceMasterForTest(
+          createResourceMaster({
+            catalogReader: new InMemoryResourceCatalogReader("valid", {
+              ...validResourceCatalogSnapshot,
+              catalog: { ...validResourceCatalogSnapshot.catalog, bindings },
+            }),
+            repository: new InMemoryResourceRepository(),
           }),
-          repository: new InMemoryResourceRepository(),
-        }).getEffectiveResourceSchema({
+        ).getEffectiveResourceSchema({
           classCode: "MATERIAL",
           familyCode: "CONDUCTORES",
           typeCode: "CABLE",
@@ -433,10 +438,12 @@ describe("Resource Master application", () => {
       };
     });
     await Promise.all(resources.map((resource) => repository.createIfIdentityAbsent(resource)));
-    const master = createResourceMaster({
-      catalogReader: new InMemoryResourceCatalogReader(),
-      repository,
-    });
+    const master = authorizeResourceMasterForTest(
+      createResourceMaster({
+        catalogReader: new InMemoryResourceCatalogReader(),
+        repository,
+      }),
+    );
 
     const ids: string[] = [];
     let cursor: string | null = null;
