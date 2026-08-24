@@ -107,6 +107,21 @@ const expectCatalogFailure = async (
 };
 
 describe("Convex Resource Master adapter", () => {
+  it("rejects client-supplied identity and authorization fields at the transport validator", async () => {
+    const t = await seededTest();
+    await expect(
+      t.query(api.resourceMaster.getResource, {
+        resourceId: "missing",
+        actorId: "attacker",
+        roles: ["Admin"],
+        capabilities: ["resource:read"],
+        claims: { subject: "provider-subject" },
+        token: "secret",
+        session: { identity: "attacker" },
+      } as never),
+    ).rejects.toThrow();
+  });
+
   it("serializes every catalog query through its registered return validator", async () => {
     const t = await seededTest();
     expect(await t.query(api.resourceMaster.getTaxonomy, {})).toMatchObject({
