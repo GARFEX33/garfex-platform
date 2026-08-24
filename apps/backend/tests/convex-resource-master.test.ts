@@ -2,6 +2,8 @@ import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { api } from "../convex/_generated/api.js";
 import schema from "../convex/schema.js";
+import { cableCatalogV1 } from "../src/resource-master/deployment/cable-catalog-v1.js";
+import { parseResourceCatalogPayload } from "../src/resource-master/domain/catalog-snapshot.js";
 
 const modules = (
   import.meta as ImportMeta & {
@@ -48,6 +50,27 @@ describe("Convex Resource Master adapter", () => {
     expect(
       await t.query(api.resourceMaster.getNaturalUnits, { familyCode: "CONDUCTORES" }),
     ).toMatchObject({ ok: true, value: { suggested: { code: "M" } } });
+  });
+
+  it("keeps staged catalog data unserved before the authority cutover", async () => {
+    const t = convexTest(schema, modules);
+    const staged = parseResourceCatalogPayload({
+      ...cableCatalogV1,
+      catalog: {
+        ...cableCatalogV1.catalog,
+        family: { ...cableCatalogV1.catalog.family, name: "staged-only" },
+      },
+    });
+    await t.run(async (ctx) =>
+      ctx.db.insert("resourceCatalogSnapshots", { ...staged, revision: 1 } as never),
+    );
+    expect(await t.query(api.resourceMaster.getTaxonomy, {})).toMatchObject({
+      ok: true,
+      value: [{ families: [{ name: "Conductores" }] }],
+    });
+    expect(
+      await t.run(async (ctx) => ctx.db.query("resourceCatalogSnapshots").take(2)),
+    ).toHaveLength(1);
   });
 
   it("persists header and attributes atomically and rejects indexed duplicates", async () => {
