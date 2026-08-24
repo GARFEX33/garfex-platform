@@ -45,6 +45,19 @@ For a local Convex deployment, start the CLI from the backend workspace:
 pnpm --filter @garfex/backend exec convex dev --local
 ```
 
+Resource Master calls also require this exact pair in the **server-side local Convex environment**:
+
+```text
+GARFEX_RUNTIME_ENV=local-development
+GARFEX_AUTH_MODE=local-development
+```
+
+Use this pair only for local development; do not commit environment files or configure it in preview,
+staging, or production. If either value is absent, partial, mismatched, or non-local, calls fail closed
+with `UNAUTHENTICATED`. This is not a production fallback: productive identity-provider integration and
+deployment remain unimplemented. See [`docs/auth-boundary.md`](docs/auth-boundary.md) for the canonical
+detailed explanation.
+
 The first run performs Convex's local setup and writes local environment state, which is ignored.
 Convex functions live in `apps/backend/convex/`; they validate transport values and call only the
 Resource Master Convex composition adapter. The core Domain and application layers do not import Convex.
@@ -52,10 +65,8 @@ Resource Master Convex composition adapter. The core Domain and application laye
 ## Authentication status
 
 The Resource Master path constructs trusted `ActorContext` server-side and authorizes capabilities in
-application code before catalog or repository work. The explicit local identity activates only when
-both `GARFEX_RUNTIME_ENV` and `GARFEX_AUTH_MODE` equal `local-development`; all other combinations fail
-closed. It is never a preview, staging, production, or productive-provider fallback. See
-[`docs/auth-boundary.md`](docs/auth-boundary.md) for the operation map and remaining open work.
+application code before catalog or repository work. See [`docs/auth-boundary.md`](docs/auth-boundary.md)
+for boundary ownership, the operation map, and deferred productive auth work.
 
 ## Commands and build graph
 
