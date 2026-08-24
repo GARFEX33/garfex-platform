@@ -137,7 +137,7 @@ for (const module of report.modules ?? []) {
         "RESOURCE_CATALOG_UNAVAILABLE",
         "RESOURCE_CATALOG_UNINITIALIZED",
         "RESOURCE_CATALOG_INVALID",
-      ].every((code) => source.includes(`\"${code}\"`))
+      ].every((code) => source.includes(`"${code}"`))
     ) {
       addViolation("convex-resource-catalog-errors", from, to);
     }
