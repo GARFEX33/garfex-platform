@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import process from "node:process";
 
@@ -70,6 +70,26 @@ const isResourceInternal = (path) =>
   /(?:^|\/)resource-master\/(?:domain|application|infrastructure)\//.test(path);
 const isConvexEntrypoint = (path) =>
   /(?:^|\/)convex\/(?!_generated\/)[^/]+\.[cm]?[jt]s$/.test(path);
+const isCatalogBootstrap = (path) =>
+  /(?:^|\/)apps\/backend\/convex\/resourceCatalogBootstrap\.[cm]?[jt]s$/.test(path);
+const isDeploymentPayload = (path) =>
+  /(?:^|\/)apps\/backend\/src\/resource-master\/deployment\//.test(path);
+const isResourceRuntime = (path) =>
+  /(?:^|\/)apps\/backend\/src\/resource-master\//.test(path) ||
+  /(?:^|\/)apps\/backend\/convex\/(?!_generated\/)/.test(path);
+const isResourceFixtureViolation = (path) =>
+  /tooling\/architecture-fixtures\/violations\/resource-master\/(?:fixture-import|runtime-deployment-import|public-catalog-port)\.ts$/.test(
+    path,
+  );
+const isCatalogFixture = (path) => /(?:^|\/)apps\/backend\/tests\/fixtures\//.test(path);
+const isCatalogPort = (path) =>
+  /(?:^|\/)apps\/backend\/src\/resource-master\/application\/ports\/resource-catalog-(?:reader|installer)\./.test(
+    path,
+  );
+const isBootstrapWrapper = (from, to) =>
+  isConvexEntrypoint(from) && isCatalogBootstrap(to) && !isCatalogBootstrap(from);
+const isResourceMasterEntrypoint = (path) =>
+  /(?:^|\/)apps\/backend\/convex\/resourceMaster\.[cm]?[jt]s$/.test(path);
 const isBannedCoreDependency = (path) =>
   /(?:^|\/)(?:convex|@convex-dev|@temporalio|ai)(?:\/|$)/.test(path) ||
   /(?:^|\/)convex\//.test(path) ||
@@ -93,6 +113,34 @@ for (const module of report.modules ?? []) {
   for (const dependency of module.dependencies ?? []) {
     const to = normalize(relative(root, dependency.resolved));
     const toModule = moduleName(to);
+    const source = readFileSync(module.source, "utf8");
+
+    if ((isResourceRuntime(from) || isResourceFixtureViolation(from)) && isCatalogFixture(to)) {
+      addViolation("resource-runtime-no-fixture", from, to);
+    }
+    if (
+      (isResourceRuntime(from) || isResourceFixtureViolation(from)) &&
+      isDeploymentPayload(to) &&
+      !isCatalogBootstrap(from)
+    ) {
+      addViolation("resource-runtime-no-deployment", from, to);
+    }
+    if ((isPublicSurface(from) || from.endsWith("/public-catalog-port.ts")) && isCatalogPort(to)) {
+      addViolation("resource-public-no-catalog-installer", from, to);
+    }
+    if (isBootstrapWrapper(from, to)) {
+      addViolation("convex-no-public-bootstrap", from, to);
+    }
+    if (
+      (isResourceMasterEntrypoint(from) || isBootstrapWrapper(from, to)) &&
+      ![
+        "RESOURCE_CATALOG_UNAVAILABLE",
+        "RESOURCE_CATALOG_UNINITIALIZED",
+        "RESOURCE_CATALOG_INVALID",
+      ].every((code) => source.includes(`"${code}"`))
+    ) {
+      addViolation("convex-resource-catalog-errors", from, to);
+    }
 
     if (/(?:^|\/)modules\/[^/]+\/domain\//.test(from)) {
       const ownDomain =
