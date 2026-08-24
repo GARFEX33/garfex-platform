@@ -30,6 +30,7 @@ import {
   type ResourceCatalogReadCode,
   type ResourceCatalogReader,
 } from "./ports/resource-catalog-reader.js";
+import { authorizeResourceMasterOperation } from "./authorization.js";
 import type { ResourceRepository } from "./ports/resource-repository.js";
 
 interface Dependencies {
@@ -237,7 +238,9 @@ export const createResourceMaster = ({
   };
 
   return {
-    async getTaxonomy() {
+    async getTaxonomy(actor) {
+      const authorization = authorizeResourceMasterOperation("getTaxonomy", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       const catalog = catalogResult.value;
@@ -256,7 +259,9 @@ export const createResourceMaster = ({
       ]);
     },
 
-    async getEffectiveResourceSchema(input) {
+    async getEffectiveResourceSchema(actor, input) {
+      const authorization = authorizeResourceMasterOperation("getEffectiveResourceSchema", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       const catalog = catalogResult.value;
@@ -291,7 +296,9 @@ export const createResourceMaster = ({
       }
     },
 
-    async getValidOptions({ attributeCode }) {
+    async getValidOptions(actor, { attributeCode }) {
+      const authorization = authorizeResourceMasterOperation("getValidOptions", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       const catalog = catalogResult.value;
@@ -321,7 +328,9 @@ export const createResourceMaster = ({
       }
     },
 
-    async getNaturalUnits({ familyCode }) {
+    async getNaturalUnits(actor, { familyCode }) {
+      const authorization = authorizeResourceMasterOperation("getNaturalUnits", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       const catalog = catalogResult.value;
@@ -342,7 +351,9 @@ export const createResourceMaster = ({
       });
     },
 
-    async createResource(input) {
+    async createResource(actor, input) {
+      const authorization = authorizeResourceMasterOperation("createResource", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       const catalog = catalogResult.value;
@@ -485,7 +496,9 @@ export const createResourceMaster = ({
       }
     },
 
-    async updateNonIdentityData({ resourceId, expectedRevision, naturalUnitCode: rawUnit }) {
+    async updateNonIdentityData(actor, { resourceId, expectedRevision, naturalUnitCode: rawUnit }) {
+      const authorization = authorizeResourceMasterOperation("updateNonIdentityData", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       const catalog = catalogResult.value;
@@ -526,7 +539,9 @@ export const createResourceMaster = ({
       return failure("NOT_FOUND", "resource not found");
     },
 
-    async deactivateResource({ resourceId, expectedRevision }) {
+    async deactivateResource(actor, { resourceId, expectedRevision }) {
+      const authorization = authorizeResourceMasterOperation("deactivateResource", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       if (
@@ -550,7 +565,9 @@ export const createResourceMaster = ({
       return failure("NOT_FOUND", "resource not found");
     },
 
-    async getResource({ resourceId }) {
+    async getResource(actor, { resourceId }) {
+      const authorization = authorizeResourceMasterOperation("getResource", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       if (typeof resourceId !== "string" || resourceId.length === 0) {
@@ -562,7 +579,9 @@ export const createResourceMaster = ({
         : success(viewResource(resource));
     },
 
-    async searchResources({ terms, lifecycle = "ACTIVE", limit = 20, cursor }) {
+    async searchResources(actor, { terms, lifecycle = "ACTIVE", limit = 20, cursor }) {
+      const authorization = authorizeResourceMasterOperation("searchResources", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       const catalog = catalogResult.value;
@@ -614,7 +633,9 @@ export const createResourceMaster = ({
       return success({ items, cursor: null });
     },
 
-    async describeResource({ resourceId }) {
+    async describeResource(actor, { resourceId }) {
+      const authorization = authorizeResourceMasterOperation("describeResource", actor);
+      if (!authorization.ok) return authorization;
       const catalogResult = await withCatalog();
       if (!catalogResult.ok) return catalogResult;
       const catalog = catalogResult.value;

@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   authorizeResourceMasterOperation,
   requiredCapabilityForResourceMasterOperation,
   resourceMasterOperationCapabilities,
 } from "../src/resource-master/application/authorization.js";
+import { createResourceMaster } from "../src/resource-master/application/resource-master.js";
+import type { ResourceRepository } from "../src/resource-master/application/ports/resource-repository.js";
 import type { ActorContext, ActorId, Capability } from "../src/resource-master/public.js";
 
 const actor = (...capabilities: Capability[]): ActorContext => ({
@@ -62,5 +64,20 @@ describe("Resource Master capability authorization", () => {
         operation,
       ).toEqual(forbidden);
     }
+  });
+
+  it("returns sanitized FORBIDDEN before catalog or repository work", async () => {
+    const loadSnapshot = vi.fn();
+    const repository = new Proxy(
+      {},
+      { get: () => vi.fn(() => Promise.reject(new Error("persistence secret"))) },
+    ) as ResourceRepository;
+    const master = createResourceMaster({
+      catalogReader: { loadSnapshot },
+      repository,
+    });
+
+    expect(await master.getResource(actor(), { resourceId: "secret-resource" })).toEqual(forbidden);
+    expect(loadSnapshot).not.toHaveBeenCalled();
   });
 });
