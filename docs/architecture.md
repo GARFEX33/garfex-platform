@@ -26,15 +26,19 @@ apps/backend/
 │       ├── application/
 │       │   ├── resource-master.ts       # use-case implementation
 │       │   └── ports/
-│       │       └── resource-repository.ts
+│       │       ├── resource-repository.ts
+│       │       └── resource-catalog-reader.ts
+│       ├── deployment/
+│       │   └── cable-catalog-v1.ts      # versioned write input only
 │       └── infrastructure/
-│           ├── cable-catalog.ts
+│           ├── convex-resource-catalog.ts
 │           ├── convex-resource-master.ts
 │           ├── convex-resource-repository.ts
 │           └── in-memory-resource-repository.ts
 └── convex/
+    ├── resourceCatalogBootstrap.ts     # internal deployment installer
     ├── schema.ts                        # Convex tables and indexes
-    └── resourceMaster.ts                # validated Convex queries and mutation
+    └── resourceMaster.ts                # validated Convex queries and mutations
 ```
 
 The checked-in `_generated` Convex bindings are generated integration support, not a domain or
@@ -58,9 +62,9 @@ adapter or platform SDK.
 | `public.ts` | Stable framework-neutral capability, result, input, and view types; no internal imports. |
 | `application/` | Use cases, orchestration, public contract types, domain rules, and application-owned ports. |
 | `domain/` | Canonicalization, identity, schema resolution, and domain data types; only its own domain. |
-| `application/ports/` | Outbound contracts needed by use cases, currently `ResourceRepository`. |
-| `infrastructure/` | Cable catalog and in-memory/Convex implementations; may implement ports and compose use cases. |
-| `convex/` | Runtime validators, schema, and exported functions; may call the Convex infrastructure composition only. |
+| `application/ports/` | Outbound contracts needed by use cases, including `ResourceRepository` and `ResourceCatalogReader`. |
+| `infrastructure/` | Convex catalog/repository and in-memory implementations; may implement ports and compose use cases. |
+| `convex/` | Runtime validators, schema, bootstrap, and exported functions; may call the Convex infrastructure composition only. |
 
 Consumers outside Resource Master import its `public.ts` surface (or the package-level type
 re-export), never `domain/`, `application/`, or `infrastructure/` internals.
@@ -75,9 +79,32 @@ Convex is the current runtime adapter, not the owner of business behavior.
   Master domain or application internals directly.
 - `ConvexResourceRepository` implements the application-owned repository port and is the only core
   adapter that reads or writes Convex database values.
-- `convex/schema.ts` owns the `resources` and `resourceAttributes` storage schema and indexes.
+- `convex/schema.ts` owns the Resource tables and the bounded `resourceCatalogSnapshots` aggregate/index.
 - Convex SDK and generated types stay out of `public.ts`, `application/`, and `domain/`.
 - The in-memory repository remains available for behavior tests without a platform runtime.
+
+## Persistent catalog authority and operations
+
+`resourceCatalogSnapshots` is one complete, bounded aggregate keyed by `resource-master`. The
+Application `ResourceCatalogReader` returns only a pure immutable snapshot; the complete-snapshot
+installer is deployment-only and reachable only as the single Convex `internalMutation`. Public
+contracts expose neither port.
+
+Every Resource Master query and mutation constructs a fresh Convex reader and performs one indexed
+`take(2)` singleton load at operation start. The snapshot is reused for taxonomy, applicability,
+validation, presentation, Search, and Describe. There is no process/global cache and no catalog N+1;
+existing per-Resource Search attribute hydration remains unchanged.
+
+The deployment payload and `tests/fixtures/cable-catalog.ts` are independent artifacts. The payload is
+only trusted write input, the fixture is test-only, and runtime never imports either. Cutover order is:
+validate and rehearse the internal installer on a named non-production deployment, verify `INSTALLED`
+and stale replay `UNCHANGED`, switch query and mutation roots together, then remove the old literal.
+Any production bootstrap requires fresh explicit human authorization after publication; apply and local
+checks never deploy or bootstrap production.
+
+After cutover, application rollback selects a compatible Convex-backed release. Catalog data recovery
+uses a previously verified versioned payload through the internal OCC installer. If no safe Convex
+snapshot exists, fail closed and fix forward—never restore the fixture or add a fallback.
 
 ## Architecture checks
 

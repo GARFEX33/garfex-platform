@@ -8,6 +8,9 @@ export const resourceErrorCodes = [
   "INVALID_LIFECYCLE",
   "INTEGRITY",
   "INTERNAL",
+  "RESOURCE_CATALOG_UNAVAILABLE",
+  "RESOURCE_CATALOG_UNINITIALIZED",
+  "RESOURCE_CATALOG_INVALID",
 ] as const;
 export type ResourceErrorCode = (typeof resourceErrorCodes)[number];
 
