@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { resourceCatalogValidator } from "./resourceCatalogValidators.js";
 
 const attributeKind = v.union(
   v.literal("CONTROLLED_OPTION"),
@@ -40,4 +41,12 @@ export default defineSchema({
     storedValue,
     identityParticipating: v.boolean(),
   }).index("by_resource_code", ["resourceId", "attributeCode"]),
+  resourceCatalogSnapshots: defineTable({
+    catalogKey: v.literal("resource-master"),
+    revision: v.number(),
+    sourceVersion: v.string(),
+    schemaVersion: v.literal(1),
+    lifecycle: v.literal("ACTIVE"),
+    catalog: resourceCatalogValidator,
+  }).index("by_catalog_key", ["catalogKey"]),
 });

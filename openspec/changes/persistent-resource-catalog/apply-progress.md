@@ -298,3 +298,464 @@ The production `infrastructure/cable-catalog.ts`, Resource repository, Convex sc
 ```
 
 Parent-owned lifecycle rows remain deferred byte-for-byte and are not implementation work for this executor. No review/refutation/correction/validation actor, receipt, commit, branch, push, issue, PR, merge, deployment, acquire, or settle operation was launched.
+
+---
+
+# Slice C apply retry — Convex persistence and internal bootstrap
+
+## Result contract
+
+- `status=blocked` — the additive Slice C implementation is present and locally verified, but the required non-production Convex rehearsal and the dependent C3/C4 completion evidence are consent-gated.
+- `executive_summary`: Preserved the interrupted Slice C workspace, confirmed C1, completed and persisted C2, regenerated the Convex API binding, and reran focused/backend/full local tests and type/build checks. The staged aggregate remains unserved by the static composition. C3 and C4 remain unchecked because no fresh consent was supplied for the direct non-production `convex run` rehearsal, and the current partial files are not format-clean enough to claim the C4 refactor gate.
+- `artifacts`: C2 is visibly checked in `openspec/changes/persistent-resource-catalog/tasks.md`; generated `apps/backend/convex/_generated/api.d.ts` is updated; this cumulative progress is appended rather than replacing Slice A/B history; the Engram task and apply-progress mirrors are updated by the parent-facing phase result.
+- `next_recommended=parent-lifecycle` — the parent owns the active attempt token and settle; after fresh consent it may launch the bounded rehearsal continuation.
+- `risks`: no complete C3/C4 checkpoint exists; the required target deployment and direct internal-mutation action still need fresh human consent; `convex codegen` emitted deployment synchronization output against the local-anonymous target even though no rehearsal command was run; `corepack pnpm format:check` still reports the interrupted candidate's formatting gaps.
+- `skill_resolution=paths-injected`.
+
+## Structured status consumed and action context
+
+- Active change: `persistent-resource-catalog`; exact assigned work unit: Slice C Convex catalog persistence and internal bootstrap. Native status was re-read after the C2 checkbox update: `artifactStore=openspec`, `applyState=ready`, `taskProgress=10 complete / 14 pending`, `nextRecommended=apply`, and `blockedReasons=[]`.
+- Native artifact paths remain the repo-local proposal, spec, design, tasks, apply-progress, and verify-report paths under `/home/garfex/PROGRAMACION/garfex-platform/openspec/changes/persistent-resource-catalog/`; proposal/spec/design/tasks/apply-progress/verify-report are present.
+- `actionContext.mode=repo-local`; workspace root and allowed edit root are `/home/garfex/PROGRAMACION/garfex-platform`; no edit-root warning occurred and every changed path is inside that root.
+- OpenSpec is the native authoritative store for this checkout; the project configuration declares the hybrid Engram mirror, which was read before work and updated before return.
+- Strict TDD is active from `openspec/config.yaml` and the parent prompt. The global strict-TDD guidance was loaded; no project-local override exists.
+- Review workload gate: the task artifact resolves the delivery path as `auto-chain` / `feature-branch-chain`, with Slice C as the assigned work-unit boundary and no size exception. Product scope is **382 additions + 0 deletions = 382 changed lines**, leaving **18 lines** under the hard 400-line bound. Planning-artifact changes are excluded from this product budget.
+- Runtime-attempt guard: the parent supplied the active `proceed` authority and owns its opaque token and settle. This retry did not run `sdd-attempt acquire`, `sdd-attempt status`, or `sdd-attempt settle`, and did not persist attempt commands or token state.
+
+## Preserved partial workspace and C2 completion
+
+The interrupted candidate was not discarded or restarted. The following additive/runtime-staging paths remain in place:
+
+- `apps/backend/convex/resourceCatalogValidators.ts`
+- `apps/backend/convex/schema.ts`
+- `apps/backend/convex/resourceCatalogBootstrap.ts`
+- `apps/backend/src/resource-master/infrastructure/convex-resource-catalog.ts`
+- `apps/backend/src/resource-master/deployment/cable-catalog-v1.ts`
+- `apps/backend/tests/convex-resource-catalog.test.ts`
+- `apps/backend/tests/convex-resource-master.test.ts`
+- `apps/backend/convex/_generated/api.d.ts`
+
+C2 is the only newly completed implementation checkbox. The adapter uses the indexed `.take(2)` singleton path, maps absent/duplicate/empty/invalid/storage failures through the stable reader errors, performs candidate validation before writes, checks replay before OCC, advances revisions atomically, reads back through the parser, and compares the complete snapshot. The only registered catalog write is the object-form internal mutation; no public bootstrap wrapper or composition-root cutover was added.
+
+The persisted task was updated immediately after C2 evidence was collected, then re-read. C1 and C2 visibly show `- [x]` with valid terminal implementation markers; C3/C4 and all D/parent rows remain visibly unchecked. Ownership-marker validation found zero malformed markers.
+
+## TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| C1 | `tests/convex-resource-catalog.test.ts` | Convex integration | N/A for the new C1 suite | ✅ Clean `HEAD` overlay with the C1 test failed during collection because the planned deployment payload module was absent; this was the intended pre-implementation missing-module RED and did not mutate the workspace | ✅ Current partial implementation passes 7 tests in the catalog suite | ✅ Singleton 0/1/>1, empty/storage mapping, transport shape, bounded lookup, bootstrap/replay/OCC, stable-code rejection, invalid-before-write, and transaction rollback paths execute real Convex-test code | ✅ Codegen and type/build checks leave the staged implementation behaviorally green; broader C3 cases remain deferred |
+| C2 | `tests/convex-resource-catalog.test.ts`, `tests/convex-resource-master.test.ts` | Convex integration | ✅ Current focused baseline passed 13/13 before codegen | ✅ The C1 contract's clean-HEAD missing-module RED drove the additive C2 implementation; no production code was added before that contract existed | ✅ Focused C2/C1 integration passed 13/13 after codegen; backend typecheck and build passed | ✅ Actual indexed `.take(2)`, generated internal reference, staged-unserved regression, invalid-before-write, replay-before-stale-OCC, replacement, and atomic rollback paths all passed | ➖ Full C4 refactor is deliberately deferred until the consent-gated rehearsal; no cutover or fallback refactor was performed |
+| C3 | `tests/convex-resource-catalog.test.ts` | Convex integration/operations | ✅ Full 18-test Convex matrix, backend 63/63, and root 65/65 safety nets pass | ➖ Historical RED chronology is preserved: the clean-HEAD missing-module RED remains the pre-implementation RED; the earlier missing-target rehearsal failure remains a separate operational blocker; no post-implementation RED is claimed | ✅ Local-anonymous rehearsal: `expectedRevision: 0` → `INSTALLED` revision `1`; stale `99` → `UNCHANGED` revision `1` | ✅ Singleton/OCC/replay/rollback/equivalence/bounds/bounded indexed read and no catalog N+1 pass; inactive-history and staged-unserved cases remain covered | ✅ Complete bounded C3 evidence is recorded without inventing a new RED |
+| C4 | generated Convex bindings and C files | Convex/type validation | ✅ Formatted/type-safe candidate; focused Convex 18/18, backend 63/63, and root 65/65 pass | ➖ Historical C1 missing-module RED remains the recorded pre-implementation RED; no new C4 behavior RED was authored after implementation | ✅ Codegen/internal API, backend/root tests, typecheck, build, and architecture checks pass | ✅ Exact four-unit reslice passes: U1 134, U2 304, U3 386, U4 204 changed lines; bounded adapter and generated/public API constraints remain green | ✅ C4 formatting, type, generated-binding, and bounded-adapter evidence is complete; no cutover or runtime-authority change was made |
+
+### Assertion-quality audit
+
+The earlier 13-passing focused assertion audit exercised real `convex-test` database writes/reads, real internal mutation calls, parser/equality functions, and a bounded-query spy. Its empty-result preconditions, no-ghost-loop/no-tautology findings, and generated-public-surface check remain valid; it correctly identified the C3 gaps at that interim checkpoint. The later 18-test matrix, local-anonymous `INSTALLED`/`UNCHANGED` rehearsal, and U1/U2/U3/U4 reslice evidence below close those gaps. No post-implementation RED is claimed.
+
+## Commands and results
+
+### Safety net and focused evidence
+
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/convex-resource-catalog.test.ts tests/convex-resource-master.test.ts` before codegen — **PASS**, 2 files / 13 tests.
+- `corepack pnpm --filter @garfex/backend typecheck` before codegen — **PASS**.
+- `corepack pnpm --filter @garfex/backend exec tsc --noEmit --pretty false` before codegen — **PASS**, no diagnostics.
+- Clean-`HEAD` isolated overlay with only `tests/convex-resource-catalog.test.ts` — **RED**, collection failed because `src/resource-master/deployment/cable-catalog-v1.js` did not exist in the pre-C2 state; the temporary overlay was removed and the working tree was untouched.
+- `corepack pnpm --filter @garfex/backend exec convex codegen --typecheck disable` — **completed** and regenerated the API binding. `api.d.ts` changed by 4 lines; `dataModel.d.ts` and `server.d.ts` were regenerated with no textual diff.
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/convex-resource-catalog.test.ts tests/convex-resource-master.test.ts` after codegen — **PASS**, 2 files / 13 tests.
+- `corepack pnpm --filter @garfex/backend typecheck && corepack pnpm --filter @garfex/backend exec tsc --noEmit --pretty false` after codegen — **PASS**, no diagnostics.
+
+### Repository safety and regression gates
+
+- `corepack pnpm --filter @garfex/backend test` — **PASS**, 9 files / 58 tests.
+- `corepack pnpm test` — **PASS**, 10 files / 60 tests; coverage 91.01% statements, 81.58% branches, 99.03% functions, 92.58% lines.
+- `corepack pnpm build` — **PASS**, root `tsc -b`.
+- `git diff --check` and per-untracked-product-file `git diff --no-index --check /dev/null <file>` — **PASS**.
+- `corepack pnpm format:check` — **FAIL (non-mutating)** because the interrupted candidate is not Biome-formatted in `resourceCatalogValidators.ts`, `schema.ts`, `cable-catalog-v1.ts`, `convex-resource-catalog.ts`, `convex-resource-catalog.test.ts`, and one staged regression assertion. This is a C4 cleanup/evidence gap, not a test or type failure; no formatter write was run because the current 382-line candidate has only 18 lines of budget headroom.
+
+### Convex deployment guard and consent gate
+
+Deployment target sources were inspected before any Convex CLI action: `apps/backend/.env.local` contains `CONVEX_DEPLOYMENT=anonymous:anonymous-agent` and `CONVEX_URL=http://127.0.0.1:3210`; no `convex.json` deployment target or production key was found. This classifies the configured target as local-anonymous, not prod. No `convex run`, `convex dev`, production deploy, or non-production rehearsal was run.
+
+The codegen command is recorded accurately: its CLI output included `Downloading current deployment state...` and `Uploading functions to Convex` while generating bindings. It was run for the task-required codegen step against the configured local-anonymous target; it was not the required direct bootstrap rehearsal and it did not invoke `resourceCatalogBootstrap:installCableCatalogV1`. No further deployment-affecting command is authorized in this retry without fresh consent.
+
+The exact missing authorization is: fresh human consent naming the non-production deployment target (including its deployment identifier) and authorizing both actions below, in order:
+
+```text
+corepack pnpm --filter @garfex/backend exec convex run resourceCatalogBootstrap:installCableCatalogV1 '{"expectedRevision":0}' --deployment <named-non-production-deployment>
+corepack pnpm --filter @garfex/backend exec convex run resourceCatalogBootstrap:installCableCatalogV1 '{"expectedRevision":<deliberately-stale-nonnegative-revision>}' --deployment <named-non-production-deployment>
+```
+
+The second invocation must return `UNCHANGED` without advancing revision. Until that consent and target are supplied, C3 and C4 remain unchecked and the phase must stop at this gate. Production `--prod`, cutover, static-reader/literal deletion, public bootstrap, hydration refactor, commit, push, PR, merge, and other production actions remain explicitly out of scope.
+
+## Product line accounting and files
+
+Exact current product diff against `HEAD`, excluding `openspec/` planning files: **382 additions, 0 deletions, 382 changed lines / 400 maximum / 18 headroom**. The 382 consists of the partial Slice C product files plus the 4-line regenerated `api.d.ts`; the tasks checkbox update is planning-only (`+2/-2`) and is not charged to the product budget. No product file was added after the codegen accounting.
+
+Changed product files:
+
+- `apps/backend/convex/_generated/api.d.ts` — generated internal/public module binding update.
+- `apps/backend/convex/schema.ts` — additive `resourceCatalogSnapshots` table and `by_catalog_key` index.
+- `apps/backend/convex/resourceCatalogValidators.ts` — transport/storage validators and explicit bootstrap result/argument validators.
+- `apps/backend/convex/resourceCatalogBootstrap.ts` — sole internal mutation entrypoint.
+- `apps/backend/src/resource-master/infrastructure/convex-resource-catalog.ts` — bounded reader and deployment installer adapter.
+- `apps/backend/src/resource-master/deployment/cable-catalog-v1.ts` — independent v1 deployment payload.
+- `apps/backend/tests/convex-resource-catalog.test.ts` — Convex singleton/bootstrap/OCC/rollback tests.
+- `apps/backend/tests/convex-resource-master.test.ts` — proof that staged Convex data remains unserved before D.
+
+No composition root, `static-resource-catalog-reader.ts`, production Cable literal, Resource Search hydration, public bootstrap wrapper, or public authority was changed.
+
+## Deviations and remaining work
+
+- The interrupted workspace contained a nearly complete compact C2 candidate, so this retry preserved it instead of restarting production code. The missing C3 test matrix and operational rehearsal were not invented or silently marked complete.
+- C4 was not marked complete: the codegen/type/build evidence is green, but the required rehearsal has no consent and `format:check` identifies readability cleanup still outstanding. Formatting the candidate wholesale would exceed the 400-line bound unless the parent authorizes a reslice or an explicit accepted size decision.
+- The staged Convex document remains intentionally unserved by the static reader. No D cutover, static literal deletion, public bootstrap, search hydration change, or delivery action occurred.
+- Parent-owned chain/review/commit/push/issue/PR/merge/production authorization rows remain deferred. No review, refutation, correction, validation, receipt, acquire, or settle actor/command was launched by this executor.
+
+### Exact unchecked task rows at return
+
+```text
+- [ ] Extend `apps/backend/tests/convex-resource-catalog.test.ts` to prove initial install returns `INSTALLED` at revision `1`, invalid candidates write nothing, duplicate authority is invalid, same source plus full semantic replay returns `UNCHANGED` before stale OCC and preserves revision, non-replay stale revisions return `CONFLICT` without writes, valid replacements advance revision atomically, stable code/ownership changes are rejected, inactive historical definitions remain interpretable, post-write read/validation/equivalence failure aborts the transaction, and equality includes every code/name/label/active flag/order/presentation/binding/rule/default/option relation/unit/policy/Search/Describe input while excluding only Convex metadata. Measure the actual v1 encoded payload/document with `TextEncoder` and assert `<=768000` bytes, depth `<=12`, arrays `<=4096`, objects `<=512`, with recorded headroom; assert the normal reader never performs catalog N+1 or an unbounded collect. <!-- sdd-owner: implementation -->
+- [ ] After C tests and the non-production rehearsal are green, refactor `apps/backend/convex/resourceCatalogValidators.ts`, `apps/backend/convex/schema.ts`, `apps/backend/convex/resourceCatalogBootstrap.ts`, `apps/backend/src/resource-master/infrastructure/convex-resource-catalog.ts`, `apps/backend/src/resource-master/deployment/cable-catalog-v1.ts`, `apps/backend/tests/convex-resource-catalog.test.ts`, and generated `apps/backend/convex/_generated/*.d.ts` only as needed for explicit validators, deterministic mapping, and readable OCC flow; run LSP diagnostics, `corepack pnpm --filter @garfex/backend exec convex codegen`, backend typecheck, and local Convex validation. <!-- sdd-owner: implementation -->
+- [ ] Add failing cutover/regression expectations to `apps/backend/tests/convex-resource-master.test.ts` and `apps/backend/tests/resource-master.test.ts`, and add architecture-failure fixtures at `tooling/architecture-fixtures/violations/resource-master/fixture-import.ts`, `runtime-deployment-import.ts`, `public-catalog-port.ts`, and `tooling/architecture-fixtures/violations/convex/public-bootstrap-wrapper.ts`; extend `tooling/tests/architecture.test.ts` to expect production fixture/deployment imports, public installer/bootstrap exposure, and missing stable Convex error literals to fail before D’s wiring changes. <!-- sdd-owner: implementation -->
+- [ ] Change `apps/backend/src/resource-master/infrastructure/convex-resource-master.ts` so each query and mutation invocation constructs a fresh `ConvexResourceCatalogReader(ctx.db)` beside the existing repository, change `apps/backend/convex/resourceMaster.ts` to add the three exact stable error literals to its return validator without swallowing them as `INTERNAL`, update `apps/backend/tests/convex-resource-master.test.ts` to seed through generated `internal.resourceCatalogBootstrap.installCableCatalogV1` before valid public operations, then delete `apps/backend/src/resource-master/infrastructure/static-resource-catalog-reader.ts` and `apps/backend/src/resource-master/infrastructure/cable-catalog.ts`; retain independent `apps/backend/src/resource-master/deployment/cable-catalog-v1.ts` and `apps/backend/tests/fixtures/cable-catalog.ts` with no runtime import. <!-- sdd-owner: implementation -->
+- [ ] Change `tooling/architecture/check.mjs` and `tooling/tests/architecture.test.ts` to reject production imports from `apps/backend/tests/fixtures`, runtime imports from `apps/backend/src/resource-master/deployment`, Application-to-Infrastructure imports, core Convex imports, public writer/installer/bootstrap exports, and public/action/http/scheduled bootstrap wrappers while accepting only the direct internal bootstrap-to-payload dependency; complete `apps/backend/tests/convex-resource-master.test.ts` regression coverage for absent/empty/invalid/unavailable catalog codes on all ten entrypoints, stable IDs/canonical identities across catalog replacement, search one-load behavior with unchanged Resource attribute hydration, and no public bootstrap in generated `api` types. <!-- sdd-owner: implementation -->
+- [ ] After all D tests are green, update `docs/architecture.md` and `README.md` with the aggregate/port boundary, one-load/no-cache rule, artifact separation, cutover order, non-production CLI rehearsal, explicit production authorization, and Convex-only rollback/fix-forward rule; then run the final focused tests, LSP diagnostics, Convex codegen/type validation, architecture checks, build, and `corepack pnpm check` without changing the excluded Resource Search hydration or adding new product surfaces. <!-- sdd-owner: implementation -->
+- [ ] Confirm the `feature-branch-chain` strategy, tracker/child ordering, and the `Decision needed before apply` release decision before applying any slice. <!-- sdd-owner: parent -->
+- [ ] Run or reuse a bounded review at each A→B, B→C, C→D, and final checkpoint, recording the exact acceptance evidence above before advancing. <!-- sdd-owner: parent -->
+- [ ] Authorize creation of commits and any commit-message/work-unit history; the executor must not commit automatically. <!-- sdd-owner: parent -->
+- [ ] Authorize branch pushes to any remote; the executor must not push automatically. <!-- sdd-owner: parent -->
+- [ ] Authorize issue creation or updates, including any tracker issue; the executor must not open or modify issues automatically. <!-- sdd-owner: parent -->
+- [ ] Authorize PR creation, draft tracker/child PR publication, review requests, and merge; no PR or merge is automatic. <!-- sdd-owner: parent -->
+- [ ] After non-production rehearsal and checkpoint approval, explicitly authorize the selected production deployment and direct `convex run resourceCatalogBootstrap:installCableCatalogV1 '{"expectedRevision":0}' --prod` invocation; production bootstrap must never be an automatic apply step and must use approved deployment credentials. <!-- sdd-owner: parent -->
+- [ ] Approve any post-cutover application rollback as Convex-backed compatible only, or authorize a verified Convex snapshot fix-forward through internal OCC tooling; never approve fixture restoration or a dual authority. <!-- sdd-owner: parent -->
+```
+
+    Before return, the authoritative tasks file was re-read and the completed C2 row was visibly checked. This phase returns the exact consent/target/action blocker rather than reporting Slice C as complete.
+
+    ---
+
+    ## Slice C final gatekeeper retry — formatted reslice and target rehearsal
+
+    ### Result contract
+
+    - `status=blocked`: the complete formatted Slice C candidate passes all local focused/backend/root/type/build/architecture/whitespace gates and the Feature Branch Chain reslice rehearsal, but the required direct non-production Convex rehearsal failed because the named target has no deployed `resourceCatalogBootstrap` function. The user guard requires stopping without a blind retry.
+    - `executive_summary`: Preserved the current workspace without restarting implementation. The final product candidate is exactly **936 additions / 0 deletions** against `HEAD`; four simulated immediate-parent Feature Branch Chain units are independently syntactically complete, compile-clean, test-clean, and each is at most 400 changed lines. The configured target was re-identified as local-anonymous with no production key. The exact `expectedRevision: 0` rehearsal was attempted once and failed before invocation; the stale replay was not run. C3/C4 therefore remain unchecked.
+    - `artifacts`: this cumulative OpenSpec progress is appended; the task artifact remains unchanged for C3/C4; the Engram task summary and this apply-progress checkpoint are mirrored under their existing topic keys.
+    - `next_recommended=parent-lifecycle`: parent owns the active native attempt token/settle and any safe deployment synchronization decision. This executor did not run attempt commands, review actors, receipts, commits, branches, pushes, PRs, merges, cutover, or production actions.
+    - `risks`: the configured local-anonymous deployment is stale or not synchronized with this candidate; the exact missing proof is `INSTALLED` at revision 1 followed by stale nonnegative replay `UNCHANGED`. No production command was attempted and no blind retry is safe.
+    - `skill_resolution=paths-injected`.
+
+    ### Structured status consumed and ownership guard
+
+    - The delegated label is `slice-c-review-reslice`; the authoritative OpenSpec change is `persistent-resource-catalog`, the only active change in the repository. Native status consumed before this retry: `artifactStore=openspec`, `applyState=ready`, `taskProgress=10 implementation tasks complete / 6 implementation tasks pending`, `nextRecommended=apply`, `actionContext.mode=repo-local`, workspace and allowed edit root `/home/garfex/PROGRAMACION/garfex-platform`, with no action-context warnings. The project config also declares a hybrid Engram mirror.
+    - The parent supplied `proceed` for the exact goal “Format reslice rehearse and verify Slice C under 400-line PR units”, maximum two attempts and 400 changed lines, bound to failed evidence revision `sha256:667d9f68fcc938e29170e553edfe84809f3bffec5e6cc791ec38dec0f59b4977`. The parent owns token/settle. No `sdd-attempt acquire`, `status`, or `settle` command was run.
+    - Ownership validation found **24 checkbox rows**: 16 implementation-owned and 8 parent-owned; malformed ownership markers: **0**. C1 and C2 are visibly checked; C3 and C4, D1–D4, and every parent-owned lifecycle row remain visibly unchecked. No checkbox was changed in this retry.
+
+    ### Deployment target identification and exact rehearsal output
+
+    Target was announced before the deployment-affecting command: **local-anonymous (`anonymous:anonymous-agent`, `http://127.0.0.1:3210`)**. `apps/backend/.env.local` supplied `CONVEX_DEPLOYMENT=anonymous:anonymous-agent`; no `convex.json` target was present and `CONVEX_DEPLOY_KEY` was absent. No `--prod` flag was used.
+
+    Exact command run once:
+
+    ```text
+    corepack pnpm --filter @garfex/backend exec convex run resourceCatalogBootstrap:installCableCatalogV1 '{"expectedRevision":0}' --deployment anonymous:anonymous-agent
+    ```
+
+    Result: **FAIL**, request ID `6d0f08af6521a4a2`. Convex reported `Could not find function for 'resourceCatalogBootstrap:installCableCatalogV1'. Did you forget to run 'npx convex dev'?` and listed only the existing `resourceMaster:*` functions. Because the configured target did not contain the internal mutation, the required stale replay was not attempted and no `INSTALLED`/`UNCHANGED` claim is made. Per the delegated guard, execution stopped without a blind retry or a deployment sync.
+
+    ### Exact current product delta
+
+    The complete formatted candidate against `HEAD` is **+936 / -0 = 936 changed lines** (planning artifacts excluded):
+
+    | Path | Additions | Deletions |
+    | --- | ---: | ---: |
+    | `apps/backend/convex/resourceCatalogValidators.ts` | 85 | 0 |
+    | `apps/backend/convex/resourceCatalogBootstrap.ts` | 69 | 0 |
+    | `apps/backend/convex/schema.ts` | 9 | 0 |
+    | `apps/backend/convex/_generated/api.d.ts` | 4 | 0 |
+    | `apps/backend/src/resource-master/deployment/cable-catalog-v1.ts` | 116 | 0 |
+    | `apps/backend/src/resource-master/infrastructure/convex-resource-catalog.ts` | 116 | 0 |
+    | `apps/backend/tests/convex-resource-catalog.test.ts` | 514 | 0 |
+    | `apps/backend/tests/convex-resource-master.test.ts` | 23 | 0 |
+    | **Total** | **936** | **0** |
+
+    The final new-file sizes are validators **85**, bootstrap **69**, deployment payload **116**, adapter **116**, and catalog test **514** lines. The workspace still has no C/D cutover, static-authority deletion, public bootstrap, hydration refactor, or production composition change.
+
+    ### Feature Branch Chain reslice manifest
+
+    The complete candidate was rehearsed out-of-tree from `git archive HEAD` at `/home/garfex/PROGRAMACION/sdd-slice-c-reslice-sim`. The 514-line catalog test was represented as behavior-cohesive syntactically complete cumulative blocks in the simulation only; no simulation file was copied back. Each row is measured against its immediate parent with `git diff --no-index --numstat`, and tests remain with the behavior they verify.
+
+    ```text
+    HEAD
+      -> U1 foundation 📍
+      -> U2 bounded reader/payload
+      -> U3 internal bootstrap/OCC
+      -> U4 complete semantic/equivalence candidate
+    ```
+
+    | Unit / immediate parent | Product paths and behavior | Immediate-parent numstat | Independent checkpoint |
+    | --- | --- | ---: | --- |
+    | U1 foundation / `HEAD` | `resourceCatalogValidators.ts` (+85), `schema.ts` (+9), temporary complete schema/transport test block (+40) | **134** | 2 focused files / 6 tests passed; backend `tsc --noEmit -p apps/backend/tsconfig.json` passed; whitespace passed |
+    | U2 bounded reader / U1 | deployment payload (+116), Convex reader/installer adapter (+116), test transition to reader/empty/storage/bounded-read behavior (+46/-26) | **304** | 2 focused files / 8 tests passed; backend `tsc --noEmit -p apps/backend/tsconfig.json` passed; whitespace passed |
+    | U3 bootstrap/OCC / U2 | internal bootstrap (+69), generated API binding (+4), staged-unserved regression (+23), test transition to install/replay/OCC/history/read-back behavior (+270/-20) | **386** | 2 focused files / 16 tests passed; backend `tsc --noEmit -p apps/backend/tsconfig.json` passed; whitespace passed |
+    | U4 complete candidate / U3 | final semantic-field, order, measurement, and all four bound-overflow test blocks (+204), yielding the complete 514-line catalog test | **204** | 2 focused files / 18 tests passed; backend `tsc --noEmit -p apps/backend/tsconfig.json` passed; whitespace passed |
+
+    Every immediate-parent unit is `<=400` (maximum **386**). The cumulative transition accounting is **134 + 304 + 386 + 204 = 1,028** because temporary test blocks are replaced between parents; the final candidate delta remains exactly **936/0**. U1→U2→U3→U4 is the required Feature Branch Chain order: U1 targets the tracker/base, and each later unit targets its immediate parent. No branch, commit, push, or PR was created.
+
+    ### Verification commands and results
+
+    - `corepack pnpm --filter @garfex/backend exec vitest run tests/convex-resource-catalog.test.ts tests/convex-resource-master.test.ts` — **PASS**, 2 files / 18 tests.
+    - `corepack pnpm --filter @garfex/backend test` — **PASS**, 9 files / 63 tests.
+    - `corepack pnpm test` — **PASS**, 10 files / 65 tests; coverage 91.16% statements, 81.61% branches, 99.06% functions, 92.72% lines.
+    - `corepack pnpm --filter @garfex/backend typecheck && corepack pnpm --filter @garfex/backend exec tsc --noEmit --pretty false` — **PASS**, no diagnostics.
+    - `corepack pnpm build` — **PASS**, root TypeScript build.
+    - `corepack pnpm typecheck` — **PASS**.
+    - `corepack pnpm test:architecture` — **PASS**, 2 tests; `architecture check passed (44 modules cruised)`.
+    - `corepack pnpm format:check` — **PASS**, Biome checked 89 files with no fixes.
+    - `git diff --check` plus `git diff --no-index --check /dev/null <each untracked product file>` — **PASS**.
+    - Prior persisted C4 codegen evidence was reused: `corepack pnpm --filter @garfex/backend exec convex codegen --typecheck disable` completed, `api.d.ts` changed by 4 lines, and `dataModel.d.ts`/`server.d.ts` had no textual diff. It was not rerun after the failed rehearsal because the configured target was missing the function and the guard forbids blind deployment retries.
+    - Each simulated unit ran the repository Vitest binary against `tests/convex-resource-catalog.test.ts tests/convex-resource-master.test.ts` and backend `tsc --noEmit --pretty false -p apps/backend/tsconfig.json`; U1/U2/U3/U4 passed respectively **6/6, 8/8, 16/16, 18/18** tests. Each unit's `git diff --no-index --check` was clean.
+
+    ### Strict TDD evidence for this retry
+
+    No production or test source was authored during this retry; the timed-out candidate and its prior RED/GREEN history were preserved. Therefore no new RED/GREEN cycle is claimed. The current candidate's local GREEN/triangulation evidence is the 18-test focused pass, 63-test backend pass, 65-test root pass, and four independent out-of-tree checkpoints above. C4 formatting/type/codegen evidence is locally green, but C3/C4 cannot be marked complete without the missing non-production `INSTALLED`/`UNCHANGED` rehearsal.
+
+    ### Persisted task state and remaining work
+
+    The persisted tasks file was re-read after verification. C1/C2 remain visibly `- [x]` with terminal implementation markers; C3/C4 remain visibly `- [ ]` and were not falsely checked. D1–D4 and parent-owned lifecycle rows remain deferred. The exact remaining implementation rows are the same two C3/C4 lines in the prior unchecked-task block, followed by D1–D4; no task checkbox update was necessary.
+
+    ### Reusable risk and next action
+
+    Local code is green and formatted, but the selected non-production Convex target has only the pre-existing public Resource Master functions. A maintainer/parent must separately synchronize or select the named non-production deployment, then authorize a fresh bounded continuation; this executor must not re-run the failed command blindly. Until that evidence exists, `next_recommended=parent-lifecycle`, not `Ready for verify`.
+
+## Slice C reslice completion — local rehearsal recovery
+
+- `status=success` for the maintainer-authorized `slice-c-review-reslice` correction checkpoint.
+- The complete formatted Slice C candidate is **936 additions / 0 deletions** and is mechanically split into four cumulative Feature Branch Chain units against their immediate parents: **U1 134**, **U2 304**, **U3 386**, and **U4 204** changed lines. Each isolated unit compiled and passed its assigned focused tests; no unit exceeds 400 and no size exception is used.
+- Final local gates from the delegated reslice: focused Convex **18/18**, backend **63**, repository **65**, plus format, whitespace, typecheck, build, and architecture checks all passed. The static pre-cutover composition remains serving and no Slice D cutover occurred.
+- The first direct local rehearsal failed safely because the configured anonymous deployment had not synchronized the new internal function. No blind retry was performed. Parent re-identified `CONVEX_DEPLOYMENT=anonymous:anonymous-agent`, confirmed `CONVEX_DEPLOY_KEY` unset, announced the local-anonymous target, and ran `corepack pnpm --filter @garfex/backend exec convex dev --once`; Convex reported functions ready at `http://127.0.0.1:3210`.
+- Against that same non-production target, `convex run resourceCatalogBootstrap:installCableCatalogV1 '{"expectedRevision":0}' --deployment anonymous:anonymous-agent` returned `INSTALLED` with revision `1`. The semantically identical replay with stale `expectedRevision: 99` returned `UNCHANGED` with revision still `1`.
+- C1, C2, C3, and C4 are now complete. D1-D4 remain unchecked. No production command, commit, push, PR, merge, public bootstrap wrapper, authority cutover, static-reader deletion, or Resource Search hydration change occurred.
+- Parent owns native passing settle bound to remediation evidence `sha256:667d9f68fcc938e29170e553edfe84809f3bffec5e6cc791ec38dec0f59b4977`, followed by independent Slice C verification.
+
+---
+
+## Slice C TDD evidence remediation — C3/C4 table reconciliation
+
+### Result contract
+
+- `status=success` for the maintainer-authorized documentation-only remediation `slice-c-tdd-evidence-remediation`.
+- `executive_summary`: Reconciled the cumulative TDD Cycle Evidence table with the later verified C3/C4 completion facts. C3 now records the full 18-test matrix and local-anonymous `INSTALLED`/`UNCHANGED` rehearsal; C4 now records the formatted/type-safe candidate, generated/internal API and repository gates, and the exact U1/U2/U3/U4 reslice. Historical RED chronology is preserved and no post-implementation RED is fabricated.
+- `artifacts`: OpenSpec `apply-progress.md` was updated and its Engram mirror was saved under `sdd/persistent-resource-catalog/apply-progress`; observation `1569` was re-read after save.
+- `next_recommended=parent-lifecycle`; parent owns the native passing settle with the remediates flag and the subsequent independent verification lifecycle.
+- `risks`: earlier blocked Slice C checkpoint prose remains intentionally preserved as history; the corrected table and later completion addendum supersede its interim C3/C4 status. D1–D4 and parent-owned lifecycle actions remain deferred.
+- `skill_resolution=paths-injected`.
+
+### Structured status consumed and action context
+
+- Active change: `persistent-resource-catalog`; native authoritative store `openspec` with the configured hybrid Engram mirror; native `applyState=ready`, `nextRecommended=apply`, and no native `blockedReasons`.
+- `actionContext.mode=repo-local`; workspace root and allowed edit root are `/home/garfex/PROGRAMACION/garfex-platform`; no edit-root warnings.
+- The parent supplied `proceed` for `slice-c-tdd-evidence-remediation`, exact goal “Reconcile C3 and C4 strict TDD artifact evidence,” maximum 2 attempts/400 lines, bound to failed verification `sha256:13c7e158ee8a43e20a0259a09e044c7945723e2a63b1d11ae2c12039273bd623`; the parent owns the token and passing settle with `remediates`.
+- Strict TDD is active. No runtime-attempt acquire/status/settle command was run, no review actor or delivery gate was launched, and no product test rerun was needed for this documentation-only correction.
+- Review workload remains `auto-chain` / `feature-branch-chain`; the combined task forecast is high risk, but this authorized remediation stays within the assigned bounded Slice C evidence slice and uses no size exception.
+
+### Exact before/after evidence semantics
+
+- **Before:** C3’s table row said the complete acceptance could not be claimed, marked TRIANGULATE `Partial only`, and deferred REFACTOR; C4’s row said GREEN/triangulation were `Not complete` and the refactor was blocked.
+- **After C3:** the table records the full 18-test matrix, local-anonymous `expectedRevision: 0 → INSTALLED revision 1`, stale `99 → UNCHANGED revision 1`, singleton/OCC/replay/rollback/equivalence/bounds/bounded-read/no-N+1, inactive-history, and staged-unserved evidence as passed.
+- **After C4:** the table records the formatted/type-safe candidate, codegen/internal API, backend/root tests, typecheck/build/architecture, and exact four-unit reslice U1 `134`, U2 `304`, U3 `386`, U4 `204` as passed.
+- **RED chronology:** the clean-HEAD missing-module failure remains the pre-implementation RED, while the earlier missing-target rehearsal failure remains a separate historical operational blocker. No new RED was authored or implied after implementation.
+
+### Files, checkbox state, and verification
+
+- This phase edited only `openspec/changes/persistent-resource-catalog/apply-progress.md`; the pre-existing working-tree modification to `tasks.md` was not touched. No product, test, spec, design, verify-report, deployment, Git, or GitHub file/action changed.
+- The persisted tasks file was re-read: C3 and C4 are visibly `- [x]` with terminal implementation ownership markers; D1–D4 and parent-owned rows remain unchecked. No checkbox update was necessary.
+- Markdown edit validation reported clean; a structural Markdown table check confirmed the corrected C3/C4 rows each retain all eight columns; `git diff --check` passed; and the corrected table was re-read after editing.
+    - No design deviation or product change occurred; no product test command was rerun because the remediation only corrected recorded evidence.
+
+---
+
+# Slice D apply — Convex authority cutover, separation, guards, and operator docs
+
+## Result contract
+
+- `status=success` for the delegated Slice D work unit `slice-d-convex-authority-cutover`.
+- `executive_summary`: D1–D4 are implemented. Both query and mutation composition roots now construct a fresh `ConvexResourceCatalogReader(ctx.db)`, the static runtime reader and productive TypeScript catalog literal are deleted, and all valid Convex regressions seed through the generated internal bootstrap. Post-cutover absent, empty, invalid, and adapter-unavailable catalog states fail closed with the exact stable public codes across all ten entrypoints. Architecture fixtures and named zone rules reject fixture/deployment/runtime/public-bootstrap violations while the valid graph passes. Operator documentation records the one-aggregate/one-load boundary, separated artifacts, non-production rehearsal, explicit production authorization, and Convex-only rollback.
+- `artifacts`: D product/test/tooling/docs files are changed in the workspace; this cumulative `apply-progress.md` is updated; the OpenSpec task checkbox update is deliberately performed only after this evidence is mirrored to Engram; the final Engram mirror uses topic `sdd/persistent-resource-catalog/apply-progress`.
+- `next_recommended=parent-lifecycle`; parent owns settle, bounded review, receipts, commits, branch/PR lifecycle, publication, and delivery gates. This executor did not start review/refutation/correction/validation actors or create/approve receipts.
+- `risks`: the installed TypeScript language-server executable is unavailable, so zero-diagnostic backend `tsc --noEmit` is the CLI substitute; Convex codegen was run only against the identified local-anonymous target and no production deploy/bootstrap was attempted. The complete product candidate is over a single 400-line diff, so the concrete two-unit Feature Branch Chain reslice below is the review boundary; no size exception is used.
+- `skill_resolution=paths-injected`.
+
+## Structured status consumed and action context
+
+- Active change: `persistent-resource-catalog`; native status was consumed before work from `gentle-ai sdd-status`: `artifactStore=openspec`, `applyState=ready`, `nextRecommended=apply`, 12 implementation rows complete and D1–D4 remaining, with verify/archive blocked pending implementation and parent lifecycle.
+- Required artifacts were read from the authoritative OpenSpec paths before editing: proposal, `specs/resource-master-catalog/spec.md`, design, tasks, cumulative apply-progress, verify-report, and `openspec/config.yaml`. The hybrid Engram mirrors for tasks/spec/design/apply-progress were also searched and full observations were fetched before this Slice D evidence was recorded.
+- Parent supplied `proceed` for `slice-d-convex-authority-cutover`, `auto-chain` / `feature-branch-chain`, maximum two attempts, and hard 400 changed-line work-unit budget. Parent owns the opaque runtime token and settle; this executor ran no `sdd-attempt` command and persisted no attempt state.
+- `actionContext.mode=repo-local`; workspace root and sole allowed edit root are `/home/garfex/PROGRAMACION/garfex-platform`; every changed path is inside that root and no edit-root warning occurred.
+- Deployment guard warning: direct read access to `apps/backend/.env.local` was blocked by the safety policy. The parent-provided target was independently reconciled with `convex.json` (functions directory only) and `CONVEX_DEPLOY_KEY=unset`; the announced and used target was local-anonymous `anonymous:anonymous-agent`, never production.
+
+## Completed implementation tasks and persisted-checkbox plan
+
+The four D implementation rows are complete by evidence below. Their persisted `- [x]` updates are applied only after this cumulative progress is saved and the Engram mirror is saved, then the task file is re-read. Parent-owned rows remain byte-for-byte deferred.
+
+- D1: RED cutover regression and architecture violation fixtures/rule expectations were written first; the expected pre-wiring failures were captured. The four named fixtures are `fixture-import.ts`, `runtime-deployment-import.ts`, `public-catalog-port.ts`, and `convex/public-bootstrap-wrapper.ts`.
+- D2: both composition roots switch atomically to fresh Convex readers; valid tests seed through `internal.resourceCatalogBootstrap.installCableCatalogV1`; `static-resource-catalog-reader.ts` and `infrastructure/cable-catalog.ts` are deleted; deployment payload and test fixture remain separate and no production source imports either.
+- D3: all-ten-entrypoint absent/empty/invalid/unavailable failure behavior, stable IDs/canonical identity after a catalog replacement, Search values/hydration regression, public API absence, bounded architecture rules, and valid-graph acceptance are covered.
+- D4: `README.md` and `docs/architecture.md` document aggregate/port ownership, one-load/no-cache, artifact separation, cutover/rehearsal/authorization, and Convex-only rollback; final release gates pass.
+
+## TDD Cycle Evidence
+
+| Task | Test file / layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+| --- | --- | --- | --- | --- | --- | --- |
+| D1 | `convex-resource-master.test.ts`, `architecture.test.ts` / Convex + architecture | ✅ backend 26/26 and architecture 2/2 baseline | ✅ persisted-authority expectation failed with static `Conductores`; new rule expectation failed before guard rules | ✅ cutover/fixture guard implementation made focused tests pass | ✅ both roots, named violation rules, and stable error expectations exercised | ✅ formatted test/tooling files remain green |
+| D2 | `convex-resource-master.test.ts`, `resource-master.test.ts` / Convex + regression | ✅ D1 RED and prior 26/26 | ✅ new test required persisted family data and generated internal seed | ✅ 26/26 focused pass after fresh readers, seeding, and deletion | ✅ all valid query/mutation regressions and independent test fixture pass | ✅ no static/deployment runtime import remains |
+| D3 | `convex-resource-master.test.ts`, architecture fixtures / Convex + architecture | ✅ application all-ten matrix and C 18-test matrix retained | ✅ absent/empty/invalid/unavailable expectations were added against the cutover candidate | ✅ focused D matrix passes 50 tests across four backend files | ✅ all ten states, identity replacement, Search values, bounded `take(2)`, named negative rules, and valid graph pass | ✅ guard code and test assertions formatted and type-clean |
+| D4 | `README.md`, `docs/architecture.md` / documentation + release gates | ✅ focused 50/50 and architecture 2/2 | ✅ D4 acceptance required durable operational boundary text and final gates | ✅ codegen/type/build/check pass | ✅ docs cover both operator paths and rollback constraints without new product surface | ✅ final `corepack pnpm check` is clean |
+
+## Verification commands and results
+
+- D1 RED: `corepack pnpm --filter @garfex/backend exec vitest run tests/convex-resource-master.test.ts` — **EXPECTED FAIL**, 1 failed / 6 passed; the static reader returned `Conductores` instead of persisted `Persisted`.
+- D1 RED: `corepack pnpm exec vitest run tooling/tests/architecture.test.ts` — **EXPECTED FAIL**, the new named-rule expectations were absent before the checker rules.
+- D2 GREEN: `corepack pnpm --filter @garfex/backend exec vitest run tests/convex-resource-master.test.ts tests/resource-master.test.ts` — **PASS**, 2 files / 26 tests.
+- D2 GREEN: `corepack pnpm --filter @garfex/backend typecheck` — **PASS**.
+- D3 focused: `corepack pnpm --filter @garfex/backend exec vitest run tests/convex-resource-master.test.ts tests/resource-master.test.ts tests/resource-master-catalog-boundary.test.ts tests/convex-resource-catalog.test.ts` — **PASS**, 4 files / 50 tests.
+- D3 architecture: `corepack pnpm exec vitest run tooling/tests/architecture.test.ts && node tooling/architecture/check.mjs` — **PASS**, 2 tests and `architecture check passed (42 modules cruised)`.
+- D4 local Convex codegen, after separate target announcement `local-anonymous anonymous:anonymous-agent`: `corepack pnpm --filter @garfex/backend exec convex codegen` — **PASS**, generated bindings had no textual diff; no production target or bootstrap was touched.
+- D4 type/LSP substitute: `corepack pnpm --filter @garfex/backend typecheck && corepack pnpm --filter @garfex/backend exec tsc --noEmit --pretty false` — **PASS**, no diagnostics; `typescript-language-server` is unavailable.
+- D4 repository gates: `corepack pnpm test` — **PASS**, 10 files / 69 tests, 91.09% statements, 81.68% branches, 99.05% functions, 92.66% lines.
+- D4 repository gates: `corepack pnpm build` — **PASS**; `corepack pnpm typecheck` — **PASS**; `corepack pnpm format:check` — **PASS**; `corepack pnpm test:architecture` — **PASS**; `git diff --check` — **PASS**.
+- D4 full gate: `corepack pnpm check` — **PASS**, clean format/lint/typecheck/test/architecture/build sequence; final run had no warnings.
+- Feature Branch Chain simulations were run outside the workspace at `/home/garfex/PROGRAMACION/sdd-slice-d-reslice-sim`: U1 focused backend 26/26, negative architecture checkpoint, valid graph, and backend typecheck passed; U2/full candidate focused backend 30/30, negative architecture checkpoint, valid graph, and backend typecheck passed.
+
+## Deletion and artifact-separation proof
+
+- Deleted runtime authority files: `apps/backend/src/resource-master/infrastructure/static-resource-catalog-reader.ts` and `apps/backend/src/resource-master/infrastructure/cable-catalog.ts`.
+- Retained independent copies: `apps/backend/src/resource-master/deployment/cable-catalog-v1.ts` remains deployment-only and `apps/backend/tests/fixtures/cable-catalog.ts` remains test-only. No production source under `apps/backend/src` imports either; the only permitted deployment-payload edge is the internal bootstrap module.
+- `apps/backend/src/resource-master/index.ts` remains public type exports only; it exposes no reader, installer, or bootstrap. Generated public `api` has no `resourceCatalogBootstrap`, while the internal generated reference remains available to tests/deployment tooling.
+- `ConvexResourceRepository` and its existing per-Resource Search attribute reconstruction were not changed. Search now gets the one catalog snapshot before the unchanged hydration/projection flow.
+
+## Exact product delta and Feature Branch Chain reslice
+
+The final workspace product delta, excluding OpenSpec planning artifacts and including untracked violation fixtures, is **+362 / -156 = 518 changed lines**. This exceeds a single 400-line review unit, so the automatic concrete Feature Branch Chain reslice is:
+
+```text
+HEAD
+  -> D-U1 cutover + seeded regression + named architecture guards 📍
+  -> D-U2 all-ten failure/identity triangulation + operator docs
+```
+
+| Unit / immediate parent | Product paths and behavior | Changed-line accounting | Independent checkpoint |
+| --- | --- | ---: | --- |
+| D-U1 / `HEAD` | Fresh Convex readers in both roots; delete static literal/reader; seed valid tests through generated internal bootstrap; test-fixture/deployment/public-bootstrap violation fixtures and checker rules | **+102 / -154 = 256** | Convex Resource Master + legacy regression **26/26**; backend typecheck; named negative architecture graph and valid graph pass |
+| D-U2 / D-U1 | Add all-ten absent/empty/invalid/unavailable matrix, stable identity/Search regression, README and architecture documentation | **+265 / -7 = 272** | Full D focused backend **30/30**; backend typecheck; named negative architecture graph and valid graph pass |
+
+The cumulative transition accounting is **256 + 272 = 528** because the test file’s deferred D3 block replaces the temporary U1 test shape; the final candidate delta remains exactly **518**. Both immediate-parent units are under 400, no size exception is used, and no branch, commit, push, PR, or other Git lifecycle artifact was created.
+
+## Deviations, risks, and remaining tasks
+
+- No design deviation: Convex is the sole post-cutover runtime authority; there is no dual read/write, fallback, cache, public bootstrap, production deploy, production bootstrap, fixture restoration, or Resource Search hydration refactor.
+- The existing C non-production `INSTALLED` revision 1 and stale replay `UNCHANGED` revision 1 evidence was reused as the prerequisite authority checkpoint; this Slice D ran no deployment-affecting `convex run` command.
+    - Remaining implementation tasks after the mirror/checkbox reconciliation: none. Remaining parent-owned lifecycle rows are unchanged and deferred: chain/review approval, commits, pushes, issues, PRs/merge, production bootstrap authorization, and Convex-backed rollback approval.
+
+    ---
+
+    # Slice D review reslice completion — preserved formatted candidate
+
+    ## Result contract
+
+    - `status=success` for the maintainer-authorized `slice-d-review-reslice` apply checkpoint.
+    - `executive_summary`: Preserved the timed-out partial actor's complete formatted D candidate without restarting, discarding, branching, committing, pushing, publishing, or running a production action. Revalidated D1–D4, corrected the provisional reslice accounting in this evidence addendum, completed the out-of-tree Feature Branch Chain simulation, ran the requested local gates, and marked the four implementation-owned D checkboxes checked. No product defect was found; the only corrected defect was the prior evidence count for D-U2.
+    - `artifacts`: current D product files and four named architecture fixtures remain in the workspace; D1–D4 are visibly checked in the authoritative OpenSpec tasks artifact; this cumulative apply-progress addendum records the exact reslice and gate evidence; the Engram task/apply mirrors are updated separately under their existing topic keys.
+    - `next_recommended=parent-lifecycle`; parent owns the active native attempt token and settle, bounded review/receipt lifecycle, branch/commit/publication decisions, and delivery gates. This executor did not launch review, refutation, correction, validation, receipt, or delivery actors.
+    - `risks`: native status remains `applyState=ready` with verify blocked until parent-owned review approval; the standalone TypeScript language-server executable is unavailable, so clean `tsc --noEmit` is the LSP substitute; production bootstrap/deploy remains intentionally unexecuted.
+    - `skill_resolution=paths-injected`.
+
+    ## Structured status consumed and action context
+
+    - Active change: `persistent-resource-catalog`; native status was consumed before implementation and after checkbox reconciliation. Final native read reports `artifactStore=openspec`, `taskProgress=16 complete / 8 pending`, `applyState=ready`, `nextRecommended=apply`, `dependencies.verify=blocked`, and no `blockedReasons`.
+    - The 16 checked implementation rows are A1–A4, B1–B4, C1–C4, and D1–D4. The 8 pending rows are valid parent-owned lifecycle actions only; ownership audit found 24 checkbox rows, 16 implementation, 8 parent, and 0 malformed markers.
+    - Required proposal, specification, design, tasks, cumulative apply-progress, verify-report, and `openspec/config.yaml` were read from `/home/garfex/PROGRAMACION/garfex-platform/openspec/changes/persistent-resource-catalog/` before this checkpoint. The hybrid Engram task/spec/design/apply-progress topics were also searched and read; OpenSpec remains native-authoritative for this checkout.
+    - Parent supplied native `proceed` for `slice-d-review-reslice`, goal `Complete verify and reslice Slice D under 400-line PR units`, maximum 2 attempts and maximum 400 changed lines, with `auto-chain` / `feature-branch-chain` as the resolved delivery path. Parent owns token/settle; no `sdd-attempt` command was run.
+    - `actionContext.mode=repo-local`; workspace root and allowed edit root are `/home/garfex/PROGRAMACION/garfex-platform`; all edited paths are inside that root and no action-context warning was present.
+    - Review workload guard was satisfied by the maintainer-authorized Feature Branch Chain reslice: the combined D candidate is over 400, but both immediate-parent units below 400 and no size exception is used.
+
+    ## TDD Cycle Evidence
+
+    No production or test source was authored during this reslice; the preserved candidate's original D1 RED chronology is retained in the preceding D apply section. The reslice performed safety-net, GREEN, triangulation, refactor, and independent checkpoint execution without fabricating a new RED.
+
+    | Task | Test file / layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+    | --- | --- | --- | --- | --- | --- | --- |
+    | D1 | `convex-resource-master.test.ts`, `tooling/tests/architecture.test.ts` / Convex + architecture | ✅ current candidate focused 30/30 and architecture 2/2 before reslice | ✅ preserved pre-wiring authority failure and missing named-rule expectations | ✅ D-U1 focused 26/26; named negative and valid architecture graphs pass | ✅ both roots, seeded valid calls, four fixture violations, and stable error literals are exercised | ✅ U1 TypeScript diagnostics and whitespace checks pass |
+    | D2 | `convex-resource-master.test.ts`, `resource-master.test.ts` / Convex + regression | ✅ prior D1 safety net retained | ✅ preserved seeded-persisted-family expectation against the static composition | ✅ D-U1 26/26 and final D matrix 30/30; both roots use fresh readers and valid operations seed internally | ✅ stable payloads, persisted family behavior, resource writes, get/describe/search, update, deactivate, and pagination pass | ✅ deleted static reader/literal and no runtime fallback remain |
+    | D3 | `convex-resource-master.test.ts`, `resource-master-catalog-boundary.test.ts`, architecture fixtures / Convex + unit + architecture | ✅ C matrix, Application ten-entrypoint matrix, and D focused baseline retained | ✅ preserved absent/empty/invalid/unavailable acceptance failures before final wiring | ✅ final D focused matrix 50/50 and architecture 2/2 pass | ✅ all ten entrypoints cover absent, empty, invalid, unavailable, and valid states; one-load search, identity replacement, public API absence, named violation rules, and valid graph pass | ✅ separation probes, generated API checks, and clean diagnostics pass |
+    | D4 | `README.md`, `docs/architecture.md` / documentation + release gates | ✅ focused/backend/root gates retained | ✅ preserved operational-boundary acceptance requirement | ✅ codegen, typecheck, architecture, build, strict full test, and `check` pass | ✅ docs cover aggregate/port ownership, one-load/no-cache, artifact separation, rehearsal, explicit production authorization, and Convex-only rollback/fix-forward | ✅ format/lint/check are clean; no Search hydration or product surface was added |
+
+    ### TDD test summary
+
+    - Reslice checkpoint tests: U1 **26/26** and U2 **30/30** focused backend tests; each state also passed architecture tests, valid-graph checking, named negative-graph checking, and backend TypeScript diagnostics.
+    - Final current candidate: D focused **50/50**, backend aggregate **67/67**, and repository **69/69** tests pass.
+    - Layers used: Convex integration, Application/unit boundary, architecture fitness tests, and repository gates; no E2E layer is required for this backend change.
+    - Approval tests: preserved existing Resource Master regressions and the unchanged repository hydration path; no new approval test was needed during the no-source-edit reslice.
+    - Pure functions created during this reslice: none; the preserved C/D implementation already supplies the pure snapshot and adapter boundaries.
+
+    ## Exact Feature Branch Chain reslice manifest
+
+    The complete formatted D candidate was simulated out-of-tree at `/home/garfex/PROGRAMACION/sdd-slice-d-review-reslice-sim` from a clean `git archive HEAD`. No Git branch, worktree, commit, push, PR, or remote/index mutation was created. Each unit is an immediate-parent cumulative state, is syntactically complete, keeps tests with the behavior they verify, and passes its appropriate focused checks.
+
+    ```text
+    HEAD
+      -> D-U1 cutover + seeded regression + named architecture guards 📍
+      -> D-U2 all-ten failure/identity triangulation + operator docs
+    ```
+
+    | Unit / immediate parent | Exact product/test/tooling/docs scope | Additions | Deletions | Total | Checkpoint |
+    | --- | --- | ---: | ---: | ---: | --- |
+    | D-U1 / `HEAD` | Fresh Convex readers in both query/mutation roots; deletion of both runtime authorities; seeded valid Convex regressions; public stable transport literals; four named violation fixtures; architecture checker/test rules | 102 | 154 | **256** | Focused backend **26/26**, backend `tsc --noEmit`, architecture tests **2/2**, valid graph pass, named negative graph exits 1 with required D rules, whitespace pass |
+    | D-U2 / D-U1 | Complete all-ten absent/empty/invalid/unavailable matrix; stable ID/canonical identity replacement and Search regression; final architecture wording; README and architecture operator docs | 266 | 8 | **274** | Focused backend **30/30**, backend `tsc --noEmit`, architecture tests **2/2**, valid graph pass, named negative graph exits 1 with required D rules, whitespace pass |
+
+    Exact immediate-parent path accounting is:
+
+    - D-U1: `convex-resource-master.ts +3/-3`, `convex-resource-master.test.ts +31/-23`, `resource-master.test.ts +1/-1`, `architecture/check.mjs +49/-1`, `architecture.test.ts +5`, four fixtures `+13`, and runtime authority deletions `-110/-16`, totaling **+102/-154 = 256**.
+    - D-U2: `convex-resource-master.test.ts +216`, `README.md +15`, `docs/architecture.md +34/-7`, and checker formatting `+1/-1`, totaling **+266/-8 = 274**.
+    - The cumulative transition accounting is **256 + 274 = 530** because D-U2 replaces the syntactically complete temporary U1 test shape; the final workspace product delta remains **+362/-156 = 518**.
+    - Both units are below the hard 400-line budget, with headroom **144** and **126** respectively. The atomic query+mutation cutover and deletion of `cable-catalog.ts` plus `static-resource-catalog-reader.ts` are inseparable in D-U1.
+
+    ## Final verification commands and results
+
+    - `corepack pnpm --filter @garfex/backend exec vitest run tests/convex-resource-master.test.ts tests/resource-master.test.ts tests/resource-master-catalog-boundary.test.ts tests/convex-resource-catalog.test.ts` — **PASS**, 4 files / **50 tests**.
+    - `corepack pnpm --filter @garfex/backend test` — **PASS**, 9 files / **67 tests**.
+    - `corepack pnpm --filter @garfex/backend typecheck` — **PASS**; `corepack pnpm --filter @garfex/backend exec tsc --noEmit --pretty false` — **PASS**, no diagnostics.
+    - `corepack pnpm typecheck` — **PASS**; `corepack pnpm format:check` — **PASS**, Biome checked 91 files with no fixes.
+    - `corepack pnpm test:architecture` — **PASS**, 2 tests and `architecture check passed (42 modules cruised)`.
+    - `corepack pnpm build` — **PASS**, root TypeScript build.
+    - `corepack pnpm test` — **PASS**, 10 files / **69 tests**; coverage statements **91.09%**, branches **81.68%**, functions **99.05%**, lines **92.66%**.
+    - `corepack pnpm check` — **PASS**, clean format/lint/typecheck/full-test/architecture/build sequence.
+    - `corepack pnpm --filter @garfex/backend exec convex codegen` — **PASS** after announcing `local-anonymous (anonymous:anonymous-agent, http://127.0.0.1:3210)`; generated bindings had no textual diff. `CONVEX_DEPLOY_KEY` was unset, no `convex run`, `convex dev`, production bootstrap, production deploy, or production mutation was run in this D checkpoint.
+    - A standalone `typescript-language-server` executable is unavailable; the backend and root `tsc --noEmit` diagnostics are clean substitutes and are recorded as such rather than claimed as LSP output.
+
+    ## Acceptance and separation proof
+
+    - All ten public entrypoints are exercised through the real registered Convex surface for valid seeded, absent, empty, and malformed authority states, with exact `RESOURCE_CATALOG_UNAVAILABLE`, `RESOURCE_CATALOG_UNINITIALIZED`, and `RESOURCE_CATALOG_INVALID` code/message pairs; the direct adapter-unavailability matrix covers all ten composed operations and redacts storage detail.
+    - Valid seeded regressions cover taxonomy, effective schema, options, units, create, update, get, deactivate, search, describe, persistence, pagination, and return validators. The Application boundary proves one reader load per operation and one load for a three-result search; the Convex adapter proves one indexed `.take(2)` catalog read.
+    - Both composition roots contain a fresh `new ConvexResourceCatalogReader(ctx.db)` and no dual/fallback/cache path remains. `apps/backend/src/resource-master/index.ts` remains public type exports only, and generated public `api` has no `resourceCatalogBootstrap`.
+    - Runtime authorities deleted: `apps/backend/src/resource-master/infrastructure/cable-catalog.ts` and `apps/backend/src/resource-master/infrastructure/static-resource-catalog-reader.ts`. `deployment/cable-catalog-v1.ts` and `tests/fixtures/cable-catalog.ts` remain independent copies; production source has no fixture/deployment import except the direct internal bootstrap-to-payload edge, which the architecture checker explicitly permits.
+    - Named negative architecture output includes `resource-runtime-no-fixture`, `resource-runtime-no-deployment`, `resource-public-no-catalog-installer`, `convex-no-public-bootstrap`, and `convex-resource-catalog-errors`; valid graphs pass and no blanket exemption was added.
+    - `ConvexResourceRepository` is byte-for-byte unchanged from `HEAD` (SHA-256 `643929d986de70a94d1d318b5ad7dc2fc503e2638d1a3ef2e174e84a3e1d1819`), proving the existing per-Resource Search attribute hydration was not refactored. README and architecture docs state that rollback is only a compatible Convex-backed release or a previously verified payload through the internal OCC installer; fixture restoration, dual reads, and fallback are forbidden.
+    - The C prerequisite evidence is reused, not newly claimed: local-anonymous `expectedRevision:0` returned `INSTALLED` revision `1`, and stale semantically identical replay returned `UNCHANGED` revision `1` before D; no production bootstrap/deploy was attempted.
+
+    ## Persisted task state and remaining lifecycle work
+
+    The authoritative tasks file was re-read after editing. D1, D2, D3, and D4 visibly show `- [x]` with terminal `<!-- sdd-owner: implementation -->` markers; all A1–C4 implementation rows remain checked; parent rows remain byte-for-byte deferred. Exact unchecked parent-owned rows are:
+
+    ```text
+    - [ ] Confirm the `feature-branch-chain` strategy, tracker/child ordering, and the `Decision needed before apply` release decision before applying any slice. <!-- sdd-owner: parent -->
+    - [ ] Run or reuse a bounded review at each A→B, B→C, C→D, and final checkpoint, recording the exact acceptance evidence above before advancing. <!-- sdd-owner: parent -->
+    - [ ] Authorize creation of commits and any commit-message/work-unit history; the executor must not commit automatically. <!-- sdd-owner: parent -->
+    - [ ] Authorize branch pushes to any remote; the executor must not push automatically. <!-- sdd-owner: parent -->
+    - [ ] Authorize issue creation or updates, including any tracker issue; the executor must not open or modify issues automatically. <!-- sdd-owner: parent -->
+    - [ ] Authorize PR creation, draft tracker/child PR publication, review requests, and merge; no PR or merge is automatic. <!-- sdd-owner: parent -->
+    - [ ] After non-production rehearsal and checkpoint approval, explicitly authorize the selected production deployment and direct `convex run resourceCatalogBootstrap:installCableCatalogV1 '{"expectedRevision":0}' --prod` invocation; production bootstrap must never be an automatic apply step and must use approved deployment credentials. <!-- sdd-owner: parent -->
+    - [ ] Approve any post-cutover application rollback as Convex-backed compatible only, or authorize a verified Convex snapshot fix-forward through internal OCC tooling; never approve fixture restoration or a dual authority. <!-- sdd-owner: parent -->
+    ```
+
+    No design deviation, production action, search-hydration refactor, public bootstrap, Git lifecycle mutation, or review/receipt action occurred. The parent must settle the bounded attempt and own the subsequent review/verify/sync/archive lifecycle.
