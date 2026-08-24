@@ -31,6 +31,8 @@ const applicabilityRule = v.object({
 });
 const resourceError = v.object({
   code: v.union(
+    v.literal("UNAUTHENTICATED"),
+    v.literal("FORBIDDEN"),
     v.literal("INVALID_ARGUMENT"),
     v.literal("NOT_FOUND"),
     v.literal("DUPLICATE"),
