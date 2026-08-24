@@ -9,13 +9,16 @@ const modules = (
     glob(pattern: string): Record<string, () => Promise<unknown>>;
   }
 ).glob("../convex/**/*.ts");
-const snapshot = { ...parseResourceCatalogPayload({
-  catalogKey: "resource-master",
-  schemaVersion: 1,
-  sourceVersion: "fixture",
-  lifecycle: "ACTIVE",
-  catalog: cableCatalog,
-}), revision: 1 };
+const snapshot = {
+  ...parseResourceCatalogPayload({
+    catalogKey: "resource-master",
+    schemaVersion: 1,
+    sourceVersion: "fixture",
+    lifecycle: "ACTIVE",
+    catalog: cableCatalog,
+  }),
+  revision: 1,
+};
 
 describe("Convex catalog schema foundation", () => {
   it("accepts one bounded aggregate through its indexed key and rejects malformed transport", async () => {
@@ -23,7 +26,8 @@ describe("Convex catalog schema foundation", () => {
     await t.run((ctx) => ctx.db.insert("resourceCatalogSnapshots", snapshot as never));
     expect(
       await t.run((ctx) =>
-        ctx.db.query("resourceCatalogSnapshots")
+        ctx.db
+          .query("resourceCatalogSnapshots")
           .withIndex("by_catalog_key", (q) => q.eq("catalogKey", "resource-master"))
           .take(2),
       ),
