@@ -32,6 +32,10 @@ describe("architecture fitness functions", () => {
     expect(output).toContain("agent-core-independent");
     expect(output).toContain("agent-no-persistence");
     expect(output).toContain("resource-core-no-platform");
+    expect(output).toContain("resource-domain-no-auth");
+    expect(output).toContain("resource-core-no-provider-types");
+    expect(output).toContain("resource-auth-composition-only");
+    expect(output).toContain("local-development-auth-isolated");
     expect(output).toContain("resource-pure-domain");
     expect(output).toContain("resource-application-no-adapter");
     expect(output).toContain("resource-public-contract-only");

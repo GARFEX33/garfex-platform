@@ -68,6 +68,13 @@ const resourceLayer = (path) =>
   )?.[1];
 const isResourceInternal = (path) =>
   /(?:^|\/)resource-master\/(?:domain|application|infrastructure)\//.test(path);
+const isResourceCore = (path) =>
+  /(?:^|\/)resource-master\/(?:public[^/]*\.[cm]?[jt]s|domain\/|application\/)/.test(path);
+const isResourceDomain = (path) => /(?:^|\/)resource-master\/domain\//.test(path);
+const isAuthModule = (path) => /(?:^|\/)auth\//.test(path);
+const isAuthComposition = (path) => /(?:^|\/)auth\/composition\.[cm]?[jt]s$/.test(path);
+const isLocalDevelopmentIdentityAdapter = (path) =>
+  /(?:^|\/)auth\/local-development-identity-adapter\.[cm]?[jt]s$/.test(path);
 const isConvexEntrypoint = (path) =>
   /(?:^|\/)convex\/(?!_generated\/)[^/]+\.[cm]?[jt]s$/.test(path);
 const isCatalogBootstrap = (path) =>
@@ -110,10 +117,33 @@ for (const module of report.modules ?? []) {
   const from = normalize(relative(root, module.source));
   const fromModule = moduleName(from);
 
+  const source = existsSync(module.source) ? readFileSync(module.source, "utf8") : "";
+  if (
+    isResourceCore(from) &&
+    /\b(?:ProviderClaims|ProviderIdentity|ProviderSubject|ConvexIdentity|SessionIdentity)\b/.test(
+      source,
+    )
+  ) {
+    addViolation("resource-core-no-provider-types", from, "<source>");
+  }
+
   for (const dependency of module.dependencies ?? []) {
     const to = normalize(relative(root, dependency.resolved));
     const toModule = moduleName(to);
-    const source = readFileSync(module.source, "utf8");
+
+    if (isResourceDomain(from) && isAuthModule(to)) {
+      addViolation("resource-domain-no-auth", from, to);
+    }
+    if (isResourceCore(from) && isAuthModule(to)) {
+      addViolation("resource-auth-composition-only", from, to);
+    }
+    if (
+      isLocalDevelopmentIdentityAdapter(to) &&
+      !isAuthComposition(from) &&
+      !isLocalDevelopmentIdentityAdapter(from)
+    ) {
+      addViolation("local-development-auth-isolated", from, to);
+    }
 
     if ((isResourceRuntime(from) || isResourceFixtureViolation(from)) && isCatalogFixture(to)) {
       addViolation("resource-runtime-no-fixture", from, to);

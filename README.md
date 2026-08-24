@@ -2,8 +2,9 @@
 
 GARFEX currently ships one backend capability: the Resource Master v2 Cable slice in
 `apps/backend`. It models cable taxonomy, applicability, canonical identity, creation, lookup,
-search, and descriptions behind a framework-neutral application contract, with in-memory and
-Convex persistence adapters.
+search, and descriptions behind a framework-neutral, actor-first application contract, with
+in-memory and Convex persistence adapters. Provider-neutral actor context and deny-by-default
+capability authorization are implemented for its ten public operations.
 
 ## Quick path
 
@@ -19,13 +20,14 @@ pnpm check
 
 | Path | Current purpose |
 | --- | --- |
-| `apps/backend/src/resource-master/` | Cable domain, application capability and ports, public contract, catalog, and adapters. |
-| `apps/backend/convex/` | Convex schema and validated query/mutation entrypoints. |
+| `apps/backend/src/resource-master/` | Cable domain, authorized application capability and ports, public contract, catalog, and adapters. |
+| `apps/backend/src/auth/` | Identity adapter boundary, local-development identity, composition roles, and transport-edge actor construction. |
+| `apps/backend/convex/` | Convex schema and authenticated, validated query/mutation entrypoints. |
 | `apps/backend/tests/` | Resource Master behavior, schema, canonicalization, and Convex adapter tests. |
 | `tooling/architecture/` | Executable dependency and ownership checks. |
 | `tooling/architecture-fixtures/` | Controlled valid and invalid graphs used to prove the checks. |
 | `docs/architecture.md` | Current layer rules and the shape required for future modules. |
-| `docs/auth-boundary.md` | Approved provider-neutral auth boundary and staged plan for the upcoming internal UI. |
+| `docs/auth-boundary.md` | Accepted auth boundary, implemented Resource Master capability map, local-development identity limits, and deferred productive auth work. |
 | `docs/surface-ui-harness-boundary.md` | Accepted separation of human-facing Surface/UI and agent Harness roles. |
 
 ## Work with the backend
@@ -45,8 +47,15 @@ pnpm --filter @garfex/backend exec convex dev --local
 
 The first run performs Convex's local setup and writes local environment state, which is ignored.
 Convex functions live in `apps/backend/convex/`; they validate transport values and call only the
-Resource Master Convex composition adapter. The core domain and application layers do not import
-Convex.
+Resource Master Convex composition adapter. The core Domain and application layers do not import Convex.
+
+## Authentication status
+
+The Resource Master path constructs trusted `ActorContext` server-side and authorizes capabilities in
+application code before catalog or repository work. The explicit local identity activates only when
+both `GARFEX_RUNTIME_ENV` and `GARFEX_AUTH_MODE` equal `local-development`; all other combinations fail
+closed. It is never a preview, staging, production, or productive-provider fallback. See
+[`docs/auth-boundary.md`](docs/auth-boundary.md) for the operation map and remaining open work.
 
 ## Commands and build graph
 
@@ -69,10 +78,10 @@ infrastructure implements it. Consumers use `resource-master/public.ts`; Convex 
 import the infrastructure composition adapter but not domain or application internals.
 
 Only the Cable catalog (`MATERIAL / CONDUCTORES / CABLE`) exists today. Other resource families,
-additional business modules, UI/API transports beyond Convex functions, authentication,
-Temporal workflows, agent integrations, and production deployment automation are explicitly
-deferred. Authentication is not implemented; its approved boundary must be enforced before the
-internal UI or externally reachable managed mutations are introduced.
+additional business modules, UI/API transports beyond Convex functions, Temporal workflows, agent
+integrations, and production deployment automation are explicitly deferred. There is no User module or
+persistence, user management, login UI, productive identity provider, or productive auth strategy. Pi
+remains a future replaceable Surface/UI, and its final transport remains open.
 
 ## Persistent Resource Catalog authority
 
