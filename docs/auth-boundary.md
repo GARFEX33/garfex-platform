@@ -1,38 +1,38 @@
 # Authentication and authorization boundary
 
-Authentication is a transport/composition-edge concern. Before GARFEX exposes the internal UI or any managed mutation externally, every UI read and write must require a trusted server-created actor context and pass deny-by-default capability authorization.
+**Status: Accepted and implemented for the Resource Master transport/application path**
 
-This decision is provider-neutral. It applies to GARFEX personnel in one organization; there is no tenant model.
+Authentication is a transport/composition concern. Resource Master application code owns deny-by-default capability authorization, and the Domain remains auth-free. The current implementation is provider-neutral and single-organization; it does not provide productive authentication or a tenant model.
 
 ## Decision
 
 | Concern | Decision |
 | --- | --- |
-| Timing | Auth is blocking before the internal UI launches or an externally reachable managed mutation is enabled, whichever comes first. |
-| Authentication | The transport/composition edge verifies identity and creates the actor context. |
-| Application | Use cases receive a trusted `ActorContext`; they never accept an actor ID supplied in request arguments. |
+| Authentication | The transport/composition edge resolves trusted identity and constructs `ActorContext` server-side. |
+| Invocation | Application operations receive trusted actor context separately and actor-first from business input. Request input never supplies authoritative actor data. |
+| Authorization | Resource Master application code maps every public operation to a capability and denies missing or unknown mappings by default. |
 | Domain | Domain types and rules know nothing about identity providers, sessions, roles, or capabilities. |
-| Authorization | Access is denied unless the actor has the capability required by the operation. |
+| Roles | Roles are composition-only mappings to capabilities. Modules authorize capabilities, never role names. |
 | Organization | All actors are GARFEX personnel in one organization. Tenant IDs and tenant routing do not exist. |
-| Audit readiness | Keep a stable provider-neutral actor ID so later audit records can identify the actor. Audit persistence is deferred. |
+| Audit readiness | `ActorId` is stable and provider-neutral so future audit records can identify an actor. Audit persistence remains deferred. |
 
 ## Trust boundary
 
 ```text
 UNTRUSTED                                      TRUSTED SERVER
 
-Internal UI
-  | request arguments (no actor ID)
+Future Surface or other caller
+  | business input (no authoritative actor data)
   v
 Transport / composition edge
-  |-- authenticate with provider adapter
-  |-- translate provider identity -> stable ActorId
-  |-- map composition role(s) -> capabilities
-  |-- reject missing/invalid identity
+  |-- resolve trusted identity through an adapter
+  |-- translate identity -> provider-neutral ActorId
+  |-- map composition role/configuration -> capabilities
+  |-- reject missing or invalid identity
   v
-Application use case + authorization policy
-  |-- require capability (deny by default)
-  |-- receive trusted ActorContext separately from input
+Resource Master application operation
+  |-- receive ActorContext separately, actor-first
+  |-- require mapped capability (deny by default)
   v
 Domain rules ---------------> Application-owned ports
   (auth-free)                       |
@@ -40,11 +40,9 @@ Domain rules ---------------> Application-owned ports
                            Infrastructure / Convex adapters
 ```
 
-The UI must not call Convex internals directly. Exported transport functions are the enforcement point and may call only the composed application capability. Provider and Convex identity types remain behind their adapters.
+Convex is infrastructure, not an identity authority or public business contract. Convex/provider claim types do not reach the Domain.
 
-## Actor contract
-
-The conceptual application-facing artifact is intentionally small and in English:
+## Materialized actor contract
 
 ```ts
 type ActorId = string & { readonly __brand: "ActorId" };
@@ -62,73 +60,82 @@ type ActorContext = Readonly<{
 }>;
 ```
 
-The server constructs this context after successful authentication. Request DTOs do not contain `actorId`, provider claims, roles, or capabilities. `ActorId` is stable across requests and provider-neutral; provider subject IDs and session/token objects do not cross the adapter boundary.
+The edge constructs `ActorContext` from trusted server-side identity. Business DTOs contain no `actorId`, provider claims, roles, or capabilities. `catalog:admin` is reserved and behaviorless: no current Resource Master operation maps to it.
 
-## Capabilities and suggested roles
+## Resource Master capability map
 
-Capabilities describe allowed actions. Roles are only composition configuration that expands to capabilities; they are not Domain concepts.
+All ten public operations are mapped explicitly:
 
-| Capability | Allows |
+| Capability | Operations |
 | --- | --- |
-| `resource:read` | Read and search managed resources. |
-| `resource:create` | Create a resource through the application contract. |
-| `resource:update-non-identity` | Update mutable descriptive fields, never canonical identity fields. |
-| `resource:deactivate` | Deactivate a resource through an explicit use case. |
-| `catalog:admin` | Reserved for future catalog administration; it grants nothing until that capability is implemented. |
+| `resource:read` | `getTaxonomy`, `getEffectiveResourceSchema`, `getValidOptions`, `getNaturalUnits`, `getResource`, `searchResources`, `describeResource` |
+| `resource:create` | `createResource` |
+| `resource:update-non-identity` | `updateNonIdentityData` |
+| `resource:deactivate` | `deactivateResource` |
+| `catalog:admin` | None; reserved for future catalog administration. |
 
-Suggested initial mapping:
+Unknown or unmapped operation names fail closed. Adding an operation requires a deliberate capability mapping.
+
+## Roles remain composition-only
+
+The implemented composition mappings are:
 
 | Composition role | Capabilities |
 | --- | --- |
 | Viewer | `resource:read` |
 | Editor | Viewer capabilities plus `resource:create` and `resource:update-non-identity` |
-| Admin | Editor capabilities plus `resource:deactivate`; reserve `catalog:admin` for explicit future assignment |
+| Admin | Editor capabilities plus `resource:deactivate` |
 
-Mappings are configuration, not an inheritance model in the application or Domain. Adding a use case requires naming its required capability and updating mappings deliberately; unknown operations remain denied.
+These mappings are not an inheritance model in the application or Domain. Resource Master authorizes only capabilities.
 
 ## Request and denial flow
 
-1. The UI sends operation input without identity or authorization fields.
-2. The edge asks the provider adapter to authenticate the request.
-3. Missing, invalid, or expired authentication stops at the edge with `UNAUTHENTICATED`.
-4. The composition layer resolves a stable `ActorId`, maps roles to capabilities, and creates `ActorContext`.
-5. The authorization policy checks the capability required by the application operation.
-6. An authenticated actor lacking that capability receives `FORBIDDEN`; the use case and repository are not invoked.
-7. An allowed request invokes the application contract with actor context separate from operation input, then proceeds through existing ports and adapters.
+1. The caller supplies business input without authoritative identity or authorization fields.
+2. The transport/composition edge resolves identity through its configured adapter.
+3. Missing, invalid, rejected, or unavailable identity returns sanitized `UNAUTHENTICATED` before application invocation.
+4. The edge constructs trusted `ActorContext` and passes it separately, actor-first, to the operation.
+5. Resource Master checks the operation's required capability before catalog, repository, or persistence access.
+6. A missing capability or unknown operation returns sanitized `FORBIDDEN` before that work begins.
+7. Only an authorized request proceeds through business validation, Domain rules, and application-owned ports.
 
-Transport status codes may vary, but the public error contract exposes only `UNAUTHENTICATED` or `FORBIDDEN`, not provider names, claim failures, token details, role internals, or whether a protected resource exists. Business validation and not-found results remain separate application errors after authorization succeeds.
+Public auth errors expose no provider names, claim failures, token details, role internals, or protected-resource existence. Business validation and not-found results remain separate application errors after authorization succeeds.
 
-## Adapter responsibilities
+## Local development identity adapter
 
-- **Identity provider adapter:** validate provider credentials/session state and translate the provider subject to a stable provider-neutral `ActorId`.
-- **Composition adapter:** map trusted personnel roles to capabilities and create immutable `ActorContext`.
-- **Transport adapter:** require authentication for every UI read/write, select the required capability, normalize auth errors, and keep actor data out of request arguments.
-- **Application policy:** centralize operation-to-capability checks and deny missing or unknown grants by default.
-- **Convex adapter:** translate persistence values only; do not expose Convex identity types or generated internals to the UI, application, or Domain.
+An explicit Local Development Identity Adapter resolves one fixed provider-neutral development `ActorId`. It grants:
 
-## Required tests and threat invariants
+- `resource:read`;
+- `resource:create`;
+- `resource:update-non-identity`; and
+- `resource:deactivate`.
 
-Contract and policy tests must prove:
+It does not grant `catalog:admin`.
 
-- every UI operation declares a required capability and unknown operations are denied;
-- no actor ID, role, capability, provider claim, or token is accepted from request arguments;
-- absent or invalid authentication returns `UNAUTHENTICATED` before application work;
-- an authenticated actor without the required capability returns `FORBIDDEN` without repository work;
-- each minimal capability allows only its named operation, including the non-identity update restriction;
-- role mappings are tested at composition level and do not enter Domain tests;
-- provider and Convex identities are translated at adapters and never leak into public errors or core contracts; and
-- the UI can reach managed data only through authenticated transport entrypoints, never Convex internals.
+The adapter activates only when both server-side values match exactly:
 
-These are security invariants, not UI conventions. Client-side route guards or hidden controls may improve usability but never satisfy enforcement.
+```text
+GARFEX_RUNTIME_ENV=local-development
+GARFEX_AUTH_MODE=local-development
+```
 
-## Staged implementation plan
+Missing, partial, mismatched, unknown, preview, staging, or production values fail closed with `UNAUTHENTICATED`. The adapter is never a fallback and is not a productive identity strategy. This documents code behavior, not a production deployment configuration.
 
-1. **Contract and policy tests:** introduce `ActorContext`, capability vocabulary, operation requirements, deny-by-default behavior, and negative tests first.
-2. **Provider adapter selection:** evaluate and select a provider, then implement identity-to-`ActorId` translation without changing core contracts.
-3. **Edge enforcement:** authenticate every UI read/write, construct actor context server-side, and enforce capabilities before use-case execution.
-4. **Integration tests:** exercise authenticated, unauthenticated, forbidden, adapter-leakage, and direct-access denial paths across the transport boundary.
-5. **Deployment safeguards:** keep externally reachable managed mutations and the internal UI disabled until auth configuration and integration checks pass; fail closed when configuration is absent.
+## Security invariants
 
-## Non-goals
+The implementation and its tests enforce that:
 
-This decision does not select or install an identity provider, build a login UI, introduce multi-tenancy, support machine-to-machine authentication, persist audit events, or implement catalog administration. It also does not move authorization into the Domain or make roles part of business modeling.
+- trusted actor context is server-created and separate from business input;
+- every current Resource Master operation has an explicit required capability;
+- unknown operations are denied;
+- unauthenticated requests stop before application invocation;
+- forbidden requests stop before catalog, repository, or persistence work;
+- roles stay at composition and provider/Convex identity types stay out of Domain; and
+- auth errors are sanitized.
+
+Client-side route guards or hidden controls may improve usability but never satisfy enforcement.
+
+## Open and deferred work
+
+There is no User domain, module, or persistence; user management; login UI; productive identity provider; or productive authentication strategy. Pi remains only a future replaceable Surface/UI, and its physical transport remains open. Before any productive or externally reachable use, GARFEX still needs an explicitly selected productive identity adapter, deployment configuration, and integration validation.
+
+This decision does not introduce multi-tenancy, machine-to-machine authentication, audit persistence, or catalog administration. It does not move authorization into Domain or make roles part of business modeling.

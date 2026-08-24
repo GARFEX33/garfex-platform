@@ -91,7 +91,7 @@ This decision neither modifies nor defers the accepted provider-neutral authenti
 - there is no temporary auth bypass or direct persistence access; and
 - the owning module performs final authorization.
 
-The auth provider remains open and authentication remains unimplemented, as recorded in the related accepted decision.
+Provider-neutral actor contracts, server-side actor construction, and Resource Master capability authorization are implemented. The only identity implementation is an explicit local-development adapter; productive provider selection, login UI, and productive authentication strategy remain open.
 
 #### Forbidden dependency directions
 
@@ -152,11 +152,11 @@ This decision intentionally leaves the following open:
 
 ## CURRENT IMPLEMENTATION STATUS
 
-Resource Master is currently the only implemented capability. No Pi Surface or Harness integration, Agent Platform, GARFEX Tools, model/provider integration, or agentic execution is implemented.
+Resource Master is currently the only implemented capability. Its auth boundary is materialized without implementing or selecting a Surface transport. No Pi Surface or Harness integration, Agent Platform, GARFEX Tools, productive identity provider, model/provider integration, or agentic execution is implemented.
 
 Architecture fixtures are dependency-rule fixtures; they are not an Agent Platform implementation.
 
-This decision makes no Resource Master or other business-module change. It does not select a transport or first Harness, deploy anything to production, change auth policy, or canonize a full Working Design.
+This decision does not select a transport or first Harness, deploy anything to production, change auth policy, or canonize a full Working Design. The separate auth implementation does not implement Pi, a Harness, or an Agent Platform.
 
 ## Related decisions/documentation
 
