@@ -125,32 +125,52 @@ export interface ResourceSummary {
 }
 
 export interface ResourceMaster {
-  getTaxonomy(): Promise<Result<TaxonomyView[]>>;
-  getEffectiveResourceSchema(input: {
-    readonly classCode: string;
-    readonly familyCode: string;
-    readonly typeCode: string;
-  }): Promise<Result<{ readonly attributes: EffectiveAttributeView[] }>>;
-  getValidOptions(input: {
-    readonly attributeCode: string;
-  }): Promise<Result<{ readonly code: string; readonly label: string }[]>>;
-  getNaturalUnits(input: { readonly familyCode: string }): Promise<
+  getTaxonomy(actor: ActorContext): Promise<Result<TaxonomyView[]>>;
+  getEffectiveResourceSchema(
+    actor: ActorContext,
+    input: {
+      readonly classCode: string;
+      readonly familyCode: string;
+      readonly typeCode: string;
+    },
+  ): Promise<Result<{ readonly attributes: EffectiveAttributeView[] }>>;
+  getValidOptions(
+    actor: ActorContext,
+    input: { readonly attributeCode: string },
+  ): Promise<Result<{ readonly code: string; readonly label: string }[]>>;
+  getNaturalUnits(
+    actor: ActorContext,
+    input: { readonly familyCode: string },
+  ): Promise<
     Result<{
       readonly allowed: { readonly code: string; readonly name: string }[];
       readonly suggested: { readonly code: string; readonly name: string };
     }>
   >;
-  createResource(input: CreateResourceInput): Promise<Result<ResourceView>>;
-  updateNonIdentityData(input: UpdateNonIdentityDataInput): Promise<Result<ResourceView>>;
-  deactivateResource(input: DeactivateResourceInput): Promise<Result<ResourceView>>;
-  getResource(input: { readonly resourceId: string }): Promise<Result<ResourceView>>;
-  searchResources(input: {
-    readonly terms: string;
-    readonly lifecycle?: ResourceLifecycleFilter;
-    readonly limit?: number;
-    readonly cursor?: string | null;
-  }): Promise<Result<{ readonly items: ResourceSummary[]; readonly cursor: string | null }>>;
-  describeResource(input: {
-    readonly resourceId: string;
-  }): Promise<Result<{ readonly resourceId: string; readonly description: string }>>;
+  createResource(actor: ActorContext, input: CreateResourceInput): Promise<Result<ResourceView>>;
+  updateNonIdentityData(
+    actor: ActorContext,
+    input: UpdateNonIdentityDataInput,
+  ): Promise<Result<ResourceView>>;
+  deactivateResource(
+    actor: ActorContext,
+    input: DeactivateResourceInput,
+  ): Promise<Result<ResourceView>>;
+  getResource(
+    actor: ActorContext,
+    input: { readonly resourceId: string },
+  ): Promise<Result<ResourceView>>;
+  searchResources(
+    actor: ActorContext,
+    input: {
+      readonly terms: string;
+      readonly lifecycle?: ResourceLifecycleFilter;
+      readonly limit?: number;
+      readonly cursor?: string | null;
+    },
+  ): Promise<Result<{ readonly items: ResourceSummary[]; readonly cursor: string | null }>>;
+  describeResource(
+    actor: ActorContext,
+    input: { readonly resourceId: string },
+  ): Promise<Result<{ readonly resourceId: string; readonly description: string }>>;
 }
