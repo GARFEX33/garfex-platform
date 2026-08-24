@@ -37,6 +37,11 @@ describe("architecture fitness functions", () => {
     expect(output).toContain("resource-public-contract-only");
     expect(output).toContain("convex-entrypoint-no-core-internals");
     expect(output).toContain("resource-consumers-public-only");
+    expect(output).toContain("resource-runtime-no-fixture");
+    expect(output).toContain("resource-runtime-no-deployment");
+    expect(output).toContain("resource-public-no-catalog-installer");
+    expect(output).toContain("convex-no-public-bootstrap");
+    expect(output).toContain("convex-resource-catalog-errors");
     expect(output).toContain("no-circular");
     expect(output).toContain("no-unresolved");
   });
