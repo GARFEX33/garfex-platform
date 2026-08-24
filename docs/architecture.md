@@ -4,10 +4,10 @@ The repository is a modular backend with one implemented capability:
 `apps/backend/src/resource-master/`. Its Resource Master v2 Cable slice keeps business rules
 framework-neutral and isolates Convex behind application-owned ports and infrastructure adapters.
 
-Authentication and authorization will follow the provider-neutral
-[auth boundary](./auth-boundary.md): the transport/composition edge creates a trusted actor context,
-the application enforces capabilities deny-by-default, and the Domain remains auth-free. This boundary
-is blocking before the internal UI or externally reachable managed mutations are introduced.
+The provider-neutral [auth boundary](./auth-boundary.md) is now materialized for Resource Master:
+the transport/composition edge creates trusted actor context, the application enforces capabilities
+deny-by-default, and the Domain remains auth-free. The included identity adapter is local-development
+only; productive identity and authentication strategy remain open.
 
 ## Current layout
 
@@ -15,8 +15,9 @@ is blocking before the internal UI or externally reachable managed mutations are
 apps/backend/
 ├── src/
 │   ├── index.ts                         # package-level public type exports
+│   ├── auth/                            # identity, composition, roles, and edge enforcement
 │   └── resource-master/
-│       ├── public.ts                    # stable capability and DTO contracts
+│       ├── public.ts                    # stable actor, capability, and DTO contracts
 │       ├── index.ts                     # Resource Master public type exports
 │       ├── domain/
 │       │   ├── canonicalization.ts
@@ -24,7 +25,8 @@ apps/backend/
 │       │   ├── schema.ts
 │       │   └── types.ts
 │       ├── application/
-│       │   ├── resource-master.ts       # use-case implementation
+│       │   ├── authorization.ts         # operation-to-capability policy
+│       │   ├── resource-master.ts       # actor-first use-case implementation
 │       │   └── ports/
 │       │       ├── resource-repository.ts
 │       │       └── resource-catalog-reader.ts
@@ -49,25 +51,31 @@ application dependency.
 The runtime flow is:
 
 ```text
-Public capability -> Application use case -> Domain rules + Repository port
-                                             Repository port <- Infrastructure/Convex adapter
+Transport/composition -> trusted ActorContext + business input
+                                  |
+                                  v
+Public capability -> Application authorization -> Domain rules + Repository port
+                                                 Repository port <- Infrastructure/Convex adapter
 ```
 
-Dependency inversion is intentional. `application/` defines the repository port; infrastructure
-implements that port and may depend inward on application/domain types. The core never imports an
-adapter or platform SDK.
+Dependency inversion is intentional. Transport/composition authenticates and constructs trusted actor
+context; Resource Master application code authorizes before catalog or repository work. `application/`
+defines the repository port; infrastructure implements that port and may depend inward on
+application/domain types. The core never imports an adapter or platform SDK.
 
 | Area | Owns and may depend on |
 | --- | --- |
-| `public.ts` | Stable framework-neutral capability, result, input, and view types; no internal imports. |
-| `application/` | Use cases, orchestration, public contract types, domain rules, and application-owned ports. |
+| `auth/` | Provider-neutral identity adapter contract, local-development adapter, role-to-capability composition, and transport-edge actor construction. |
+| `public.ts` | Stable framework-neutral actor, capability, result, input, and view types; no internal imports. |
+| `application/` | Deny-by-default authorization, use cases, orchestration, public contract types, domain rules, and application-owned ports. |
 | `domain/` | Canonicalization, identity, schema resolution, and domain data types; only its own domain. |
 | `application/ports/` | Outbound contracts needed by use cases, including `ResourceRepository` and `ResourceCatalogReader`. |
 | `infrastructure/` | Convex catalog/repository and in-memory implementations; may implement ports and compose use cases. |
 | `convex/` | Runtime validators, schema, bootstrap, and exported functions; may call the Convex infrastructure composition only. |
 
 Consumers outside Resource Master import its `public.ts` surface (or the package-level type
-re-export), never `domain/`, `application/`, or `infrastructure/` internals.
+re-export), never `domain/`, `application/`, or `infrastructure/` internals. Public operation signatures
+receive trusted `ActorContext` separately and actor-first from business input.
 
 ## Convex isolation
 
@@ -113,6 +121,8 @@ rules and excludes `convex/_generated/` from cruising. The checks reject:
 
 - circular, unresolved, undeclared, and unknown package dependencies;
 - platform dependencies in Resource Master public/domain/application code;
+- auth composition or local-development adapters entering Resource Master application or Domain;
+- provider claim types entering the Resource Master public surface or Domain;
 - domain imports outside Resource Master domain;
 - application imports of infrastructure;
 - public contracts that expose internals;
@@ -158,6 +168,8 @@ src/modules/<module>/
 
 Temporal workflows, agent harnesses, additional transports, and other persistence technologies are
 not implemented. When introduced, they remain edge adapters and follow the same public contract and
-ownership rules rather than becoming dependencies of core code. Authentication is also not yet
-implemented; its approved boundary and staged plan are documented in
+ownership rules rather than becoming dependencies of core code. Provider-neutral actor contracts,
+transport-edge authentication composition, and Resource Master capability authorization are implemented.
+The only identity implementation is an explicit fail-closed local-development adapter; there is no
+productive identity provider, login UI, User module, or productive auth strategy. See
 [`docs/auth-boundary.md`](./auth-boundary.md).
