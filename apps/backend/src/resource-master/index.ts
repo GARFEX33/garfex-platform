@@ -1,4 +1,8 @@
+export { capabilities } from "./public.js";
 export type {
+  ActorContext,
+  ActorId,
+  Capability,
   CreateResourceInput,
   DeactivateResourceInput,
   ResourceError,

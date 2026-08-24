@@ -1,4 +1,20 @@
+export const capabilities = [
+  "resource:read",
+  "resource:create",
+  "resource:update-non-identity",
+  "resource:deactivate",
+  "catalog:admin",
+] as const;
+export type Capability = (typeof capabilities)[number];
+export type ActorId = string & { readonly __brand: "ActorId" };
+export interface ActorContext {
+  readonly actorId: ActorId;
+  readonly capabilities: ReadonlySet<Capability>;
+}
+
 export const resourceErrorCodes = [
+  "UNAUTHENTICATED",
+  "FORBIDDEN",
   "INVALID_ARGUMENT",
   "NOT_FOUND",
   "DUPLICATE",
