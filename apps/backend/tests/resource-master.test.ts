@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createResourceMaster } from "../src/resource-master/application/resource-master.js";
-import { cableCatalog } from "../src/resource-master/infrastructure/cable-catalog.js";
+import { cableCatalog } from "./fixtures/cable-catalog.js";
 import { InMemoryResourceRepository } from "../src/resource-master/infrastructure/in-memory-resource-repository.js";
 import type { PersistedResource } from "../src/resource-master/domain/types.js";
 import {

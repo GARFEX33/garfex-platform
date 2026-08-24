@@ -496,3 +496,113 @@ These D rows are CRITICAL final-change/archive blockers and approved remaining s
 - **Operational risk:** the `INSTALLED`/`UNCHANGED` rehearsal was documentary in this re-verification and intentionally not replayed because deployment-affecting commands were prohibited.
 
 `next_recommended=parent-lifecycle`: parent may settle `slice-c-reverification` as passed and preserve this exact bounded Slice C checkpoint. Do not begin D, final verify, sync, archive, deployment, or publication from this executor.
+
+---
+
+# Final Implementation Verification — complete A–D chain
+
+## Status
+
+**IMPLEMENTATION PASS.** The complete approved proposal/spec/design/tasks for `persistent-resource-catalog` is implemented and independently verified at the current uncommitted Slice D tip on `feat/persistent-catalog-convex-cutover` (`HEAD 7c25094`). This verdict is limited to implementation correctness. It does **not** authorize commits, pushes, PR publication/merge, production bootstrap/deploy, sync, or archive.
+
+Publication, production, and archive are **not ready** because eight parent-owned lifecycle rows remain deferred. No unchecked implementation-owned task remains.
+
+## Structured status and action context
+
+- Active change is exact and unambiguous: `persistent-resource-catalog`; parent supplied native `proceed` for `persistent-catalog-final-verification`, max two attempts/400 lines, and owns acquire/settle. No attempt command was run.
+- OpenSpec is native-authoritative with hybrid Engram mirroring. Required spec, tasks, apply-progress, design, config, changed code, and tests were read directly; Engram observations 1559, 1564, and 1569 were fetched in full.
+- `actionContext.mode=repo-local`; authoritative workspace and allowed root are `/home/garfex/PROGRAMACION/garfex-platform`. All implementation/report paths are owned inside that root.
+- Strict TDD is active. Global strict-TDD verify support was loaded; no project override exists.
+- CodeGraph index was present and current. MCP initialization was unavailable, so read-only upstream `codegraph status` and `codegraph explore` were used before targeted filesystem inspection.
+
+## Requirement-by-requirement verdict
+
+| Requirement | Verdict | Independent evidence |
+| --- | --- | --- |
+| 1. Convex-only production authority | PASS | Both roots instantiate `ConvexResourceCatalogReader(ctx.db)`; both TypeScript runtime authorities are deleted; scans and architecture rules find no fallback or dual authority. |
+| 2. Application-owned pure reader boundary | PASS | Application reader returns pure immutable snapshots; Public/index export only framework-neutral public types and no reader/installer/Convex metadata. |
+| 3. Complete Cable snapshot | PASS | Independent fixture/deployment payload parse and compare semantically equal; complete envelope and semantic-section tests pass. |
+| 4. Validation at both trust boundaries | PASS | Pure parser validates candidate and reconstructed document; duplicate/reference/ownership/lifecycle/rule/presentation/order/bounds tests pass. |
+| 5. Stable fail-closed outcomes | PASS | All ten entrypoints cover unavailable, absent/empty, invalid, and valid states with exact fixed redacted code/message pairs. |
+| 6. One bounded consistent load | PASS | Application one-load matrix and multi-result search pass; adapter performs one indexed `take(2)` and no catalog `collect()` or global cache exists. |
+| 7. Atomic applicability/rules | PASS | One complete aggregate owns bindings/rules; semantic validation and replacement tests reject incomplete/conflicting ownership. |
+| 8. Internal deployment-only bootstrap | PASS | Sole catalog write is object-form `internalMutation`; public `api` has no bootstrap; negative wrapper fixture is rejected. |
+| 9. Versioned replay/OCC protocol | PASS | Tests prove 0→1 install, replay-before-OCC `UNCHANGED`, stale non-replay conflict, valid replacement, no-write failures, and no CRUD surface. |
+| 10. Full semantic round trip | PASS | Read-back uses normal parser and full snapshot equality; 11 meaningful semantic/order variants compare unequal; forced mismatch rolls back. |
+| 11. Lifecycle and stable identity | PASS | Stable-code/ownership mutations reject; inactive history remains readable; replacement preserves Resource ID and canonical identity. |
+| 12. Artifact separation | PASS | Test fixture and deployment payload are independent; runtime imports neither except the explicit internal-bootstrap payload edge; named architecture negatives pass. |
+| 13. Atomic cutover and Convex rollback | PASS | Query/mutation roots switch together in D-U1; old authorities are deleted; docs permit only Convex-backed rollback/fix-forward. |
+| 14. Required verification layers | PASS | Domain, Application, Convex integration/bootstrap, architecture, regression, type, build, and full repository gates all pass. |
+| 15. Existing Resource behavior | PASS | Valid seeded taxonomy/schema/options/units/create/update/get/deactivate/search/describe/pagination regressions pass; repository file hash is unchanged. |
+| 16. Bounded non-goals | PASS | No admin/auth/UI/CRUD/workflow/history/new Resource type or Search hydration refactor was introduced. |
+| 17. Design proof obligations | PASS | Bounds `768000/12/4096/512` are enforced and measured at `3317/8/5/9`; internal Convex 1.45 CLI protocol and prior local-anonymous rehearsal evidence are credible and consistent with current internal/generated surfaces. |
+
+## Task completion
+
+- Implementation rows: **16/16 checked** (A1–A4, B1–B4, C1–C4, D1–D4).
+- Unchecked implementation markers matching `^\s*- \[ \].*sdd-owner: implementation`: **none**.
+- The eight unchecked rows are parent-owned lifecycle/operational gates, not implementation defects. They block publication/production/archive readiness:
+  1. Confirm chain strategy/tracker-child/release decision.
+  2. Record bounded reviews at A→B, B→C, C→D, and final checkpoints.
+  3. Authorize commits and history.
+  4. Authorize remote pushes.
+  5. Authorize issue/tracker changes.
+  6. Authorize PR publication/reviews/merge.
+  7. Explicitly authorize the selected production deployment and production internal bootstrap.
+  8. Approve only Convex-backed rollback or verified OCC fix-forward.
+
+## Strict TDD and assertion quality
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| TDD evidence table present | PASS | Cumulative apply-progress contains A, B, corrected C, D, and reslice tables with RED/GREEN/TRIANGULATE/REFACTOR and safety nets. |
+| Reported test files exist | PASS | All reported Domain, Application, Convex, regression, and architecture files exist. |
+| RED chronology credible | PASS | Missing-module, semantic-validation, boundary, persistence, authority-cutover, and named-rule RED evidence is preserved without fabricating post-implementation RED. |
+| GREEN remains true | PASS | Final focused 8-file matrix passes 64 tests; root suite passes 69 tests. |
+| Triangulation | PASS | Positive, negative, exact-bound, over-bound, all-ten failure, replay/OCC, rollback, identity, order, architecture, and seeded behavior variants execute. |
+| Safety nets | PASS | Backend/root/type/architecture/build/check gates remain green. |
+
+Test layers cover pure Domain unit tests, Application/in-memory boundary tests, `convex-test` integration tests, architecture fitness tests, and repository regression gates. Browser/E2E coverage is not required for this backend-only change.
+
+**Assertion quality: PASS.** No tautology, ghost loop, type-only-only assertion, assertion-free production path, smoke-only check, CSS/detail assertion, or mock-heavy suite was found. Fixed loops iterate explicit non-empty operation/variant lists and assert real parser, Application, Convex database, internal mutation, or public registered-function behavior.
+
+Relevant coverage from `corepack pnpm test`: overall 91.09% statements / 81.68% branches / 99.05% functions / 92.66% lines; snapshot foundation 97.34% lines, semantics 89.84%, snapshot contract 90.38%, Application Resource Master 89.47%, Convex catalog adapter 91.48%, Convex Resource Master 88%, and bootstrap 100%. Configured threshold is 0.
+
+## Review workload / PR boundary
+
+**PASS.** The approved `feature-branch-chain` strategy is preserved; no `size:exception` is used. Published/simulated A, B, and C units remain at or below 400 lines. The retained immediate-parent Slice D simulation was independently recounted after excluding generated `dist/tsconfig.tsbuildinfo` and dependency symlinks:
+
+- D-U1 product/test/tooling scope: **+102/-154 = 256**. Atomic query+mutation cutover and deletion of both runtime authorities are inseparable here.
+- D-U2 product/test/tooling/docs scope: **+266/-8 = 274**.
+- Final D product delta: **+362/-156 = 518**, correctly represented by two chained review units rather than one oversized PR.
+
+No scope drift was found. `ConvexResourceRepository` and Search hydration are byte-for-byte unchanged from `HEAD`, SHA-256 `643929d986de70a94d1d318b5ad7dc2fc503e2638d1a3ef2e174e84a3e1d1819`.
+
+## Commands and exact results
+
+- `codegraph status && codegraph explore "persistent resource catalog cutover implementation, validation, installer, application reader, tests, and architecture boundaries"` — PASS; current 92-file index, 593 nodes, 1,737 edges.
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/catalog-snapshot-foundation.test.ts tests/catalog-snapshot-semantics.test.ts tests/catalog-snapshot-contract.test.ts tests/schema-resolution.test.ts tests/resource-master-catalog-boundary.test.ts tests/resource-master.test.ts tests/convex-resource-catalog.test.ts tests/convex-resource-master.test.ts` — PASS, 8 files / 64 tests.
+- `corepack pnpm test:architecture` — PASS, 2 tests; valid graph passed over 42 modules.
+- `node tooling/architecture/check.mjs tooling/architecture-fixtures/violations` — expected exit 1; PASS as a negative gate, including all five catalog rule names.
+- `corepack pnpm --filter @garfex/backend typecheck && corepack pnpm --filter @garfex/backend exec tsc --noEmit --pretty false && corepack pnpm typecheck` — PASS, no diagnostics.
+- `corepack pnpm format:check` — PASS, 91 files, no fixes.
+- `corepack pnpm test` — PASS, 10 files / 69 tests; coverage 91.09/81.68/99.05/92.66.
+- `corepack pnpm build` — PASS.
+- `corepack pnpm check` — PASS: format, lint, typecheck, coverage tests, architecture tests/checker, and build.
+- `corepack pnpm --filter @garfex/backend exec convex codegen` — PASS after separate announcement of local-anonymous `anonymous:anonymous-agent` with `CONVEX_DEPLOY_KEY` unset; output synchronized only that local target and generated bindings retained an empty textual diff. No `convex run`, bootstrap, dev, deploy, or production command ran.
+- `git diff --check` plus corrected per-untracked `git diff --no-index --check /dev/null <file>` diagnostics — PASS; no whitespace errors.
+- One initial compound format/whitespace command exited 1 because normal `git diff --no-index` “files differ” status was treated as failure; corrected diagnostic handling passed and found no defect.
+- Product numstat probe — PASS, final D `+362/-156=518`.
+- Immediate-parent no-index recount — PASS after excluding generated dependency/build artifacts: D-U1 `256`, D-U2 `274`.
+- Standalone TypeScript language server — unavailable; clean backend/root `tsc --noEmit` and build are reported as substitutes, not as LSP output.
+
+## Findings and blockers
+
+- **CRITICAL:** none.
+- **WARNING:** standalone LSP diagnostics are unavailable because `typescript-language-server` is not installed; CLI TypeScript diagnostics and build are clean.
+- **Operational evidence note:** prior C local-anonymous `INSTALLED` revision 1 and stale replay `UNCHANGED` revision 1 were validated against source/tests/artifacts but intentionally not replayed because this verification forbids `convex run` and bootstrap operations.
+- **Exact readiness blocker:** the eight parent-owned rows above remain unchecked. Therefore implementation passes, but publication, production bootstrap/deploy, sync, and archive remain unauthorized/not ready.
+
+## Next recommendation
+
+Parent may settle final implementation verification as passed, complete the bounded review/publication lifecycle, and separately obtain fresh production authorization if deployment/bootstrap is desired. Do not archive until parent lifecycle rows are reconciled and operational evidence is attached; never restore a fixture authority or introduce fallback/dual reads.
