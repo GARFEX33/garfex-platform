@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as resourceCatalogBootstrap from "../resourceCatalogBootstrap.js";
+import type * as resourceCatalogValidators from "../resourceCatalogValidators.js";
 import type * as resourceMaster from "../resourceMaster.js";
 
 import type {
@@ -17,6 +19,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  resourceCatalogBootstrap: typeof resourceCatalogBootstrap;
+  resourceCatalogValidators: typeof resourceCatalogValidators;
   resourceMaster: typeof resourceMaster;
 }>;
 
