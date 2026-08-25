@@ -42,6 +42,17 @@ Domain rules ---------------> Application-owned ports
 
 Convex is infrastructure, not an identity authority or public business contract. Convex/provider claim types do not reach the Domain.
 
+The concrete GARFEX external path is recorded in the [canonical boundary](./external-garfex-boundary.md).
+Its dependency arrow is:
+
+```text
+external business input -> TrustedActorResolver -> fresh ActorContext
+                         -> Resource Master public operation -> final capability authorization
+```
+
+`TrustedActorResolver` is a server-only adapter over the existing provider-neutral composition; it does
+not select a productive IdP or accept actor authority from business input.
+
 ## Materialized actor contract
 
 ```ts

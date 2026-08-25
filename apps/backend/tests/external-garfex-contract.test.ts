@@ -597,4 +597,415 @@ describe("external GARFEX client-facing contract", () => {
       }
     });
   });
+
+  describe("external GARFEX discovery output validation", () => {
+    it("rebuilds discovery success shapes with fresh nested values", () => {
+      for (const operation of discoveryOperations) {
+        const input = successValues[operation];
+        const result = successValidators[operation](input);
+        expect(result).toEqual(input);
+        expectFresh(input, result);
+      }
+    });
+
+    it("rejects extra or malformed discovery fields as contained failures", () => {
+      for (const [operation, value] of extraSuccessCases) {
+        expectInternalFailure(successValidators[operation](value));
+      }
+
+      const malformedSuccessCases: SuccessExtraCase[] = [
+        ["getTaxonomy", [{ code: "hardware", name: "Hardware", families: "invalid" }]],
+        [
+          "getEffectiveResourceSchema",
+          { attributes: [{ ...successSchema.attributes[0], kind: "UNREVIEWED" }] },
+        ],
+        ["getValidOptions", [{ code: "bare", label: 4 }]],
+        ["getNaturalUnits", { allowed: [], suggested: null }],
+      ];
+      for (const [operation, value] of malformedSuccessCases) {
+        expectInternalFailure(successValidators[operation](value));
+      }
+    });
+
+    it("contains hostile discovery values without diagnostics", () => {
+      const extraArray = Object.assign([], { internalField: "secret" });
+      expectInternalFailure(validateExternalGetValidOptionsSuccess(extraArray));
+      expectInternalFailure(
+        validateExternalGetEffectiveResourceSchemaSuccess({
+          get attributes() {
+            throw new Error("internal schema secret");
+          },
+        }),
+      );
+      expectInternalFailure(
+        validateExternalGetTaxonomySuccess(
+          Object.assign([...successTaxonomy], { internalField: "secret" }),
+        ),
+      );
+      expectInternalFailure(
+        validateExternalGetNaturalUnitsSuccess({
+          ...successNaturalUnits,
+          suggested: { ...successNaturalUnits.suggested, internalField: "secret" },
+        }),
+      );
+    });
+
+    it("accepts null-prototype discovery objects and rebuilds them", () => {
+      const entry = Object.create(null) as Record<string, unknown>;
+      entry.code = "hardware";
+      entry.name = "Hardware";
+      entry.families = [];
+      const result = validateExternalGetTaxonomySuccess([entry]);
+      expect(result).toEqual([{ code: "hardware", name: "Hardware", families: [] }]);
+      if (!Array.isArray(result)) return;
+      expect(result[0]).not.toBe(entry);
+    });
+  });
+
+  describe("external GARFEX resource/search/mutation output validation", () => {
+    it("rebuilds every remaining success shape with fresh nested values", () => {
+      for (const operation of resourceSuccessOperations) {
+        const result = resourceSuccessValidators[operation](successResource);
+        expect(result).toEqual(successResource);
+        expectFresh(successResource, result);
+      }
+
+      const searchResult = validateExternalSearchResourcesSuccess(successSearch);
+      expect(searchResult).toEqual(successSearch);
+      expectFresh(successSearch, searchResult);
+
+      const descriptionResult = validateExternalDescribeResourceSuccess(successDescription);
+      expect(descriptionResult).toEqual(successDescription);
+      expectFresh(successDescription, descriptionResult);
+    });
+
+    it("preserves opaque cursors and nullable final-page cursors", () => {
+      const continued = validateExternalSearchResourcesSuccess(successSearch);
+      expect(continued).toMatchObject({ cursor: "opaque|cursor-v2|private-state" });
+      expect(JSON.parse(JSON.stringify(continued))).toEqual(successSearch);
+
+      const finalPage = { ...successSearch, cursor: null };
+      expect(validateExternalSearchResourcesSuccess(finalPage)).toEqual(finalPage);
+    });
+
+    it("rejects extra and malformed resource, search, and description fields", () => {
+      const resourceWithAuthority = { ...successResource, actorId: "forged" };
+      for (const operation of resourceSuccessOperations) {
+        expectInternalFailure(resourceSuccessValidators[operation](resourceWithAuthority));
+      }
+
+      const resourceWithNestedPlatformField = {
+        ...successResource,
+        attributes: successResource.attributes.map((attribute) =>
+          attribute.attributeCode === "finish"
+            ? { ...attribute, platformSecret: "hidden" }
+            : attribute,
+        ),
+      };
+      expectInternalFailure(validateExternalGetResourceSuccess(resourceWithNestedPlatformField));
+
+      const resourceWithQuantityExtra = {
+        ...successResource,
+        attributes: successResource.attributes.map((attribute) =>
+          attribute.attributeCode === "gauge"
+            ? { ...attribute, value: { magnitude: "12", unitCode: "awg", internalUnit: "hidden" } }
+            : attribute,
+        ),
+      };
+      expectInternalFailure(validateExternalCreateResourceSuccess(resourceWithQuantityExtra));
+
+      expectInternalFailure(
+        validateExternalSearchResourcesSuccess({
+          ...successSearch,
+          items: successSearch.items.map((item) => ({ ...item, repositoryId: "hidden" })),
+        }),
+      );
+      expectInternalFailure(
+        validateExternalSearchResourcesSuccess({ ...successSearch, cursor: 12 }),
+      );
+      expectInternalFailure(validateExternalSearchResourcesSuccess({ items: successSearch.items }));
+      expectInternalFailure(
+        validateExternalDescribeResourceSuccess({ ...successDescription, internalField: true }),
+      );
+    });
+
+    it("contains malformed output and hostile serialization values", () => {
+      expectInternalFailure(
+        validateExternalGetResourceSuccess({ ...successResource, revision: -1 }),
+      );
+      expectInternalFailure(
+        validateExternalUpdateNonIdentityDataSuccess({
+          ...successResource,
+          identityPolicyVersion: "v2",
+        }),
+      );
+      expectInternalFailure(
+        validateExternalSearchResourcesSuccess({
+          ...successSearch,
+          items: successSearch.items.map((item) => ({ ...item, optionCodes: [12] })),
+        }),
+      );
+      expectInternalFailure(validateExternalDescribeResourceSuccess({ resourceId: "resource-1" }));
+
+      const hostileResource = {
+        ...successResource,
+        get attributes(): never {
+          throw new Error("internal resource secret");
+        },
+      };
+      const result = validateExternalDeactivateResourceSuccess(hostileResource);
+      expectInternalFailure(result);
+      expect(JSON.stringify(result)).not.toContain("internal resource secret");
+    });
+  });
+
+  describe("external GARFEX failure validation", () => {
+    it("rebuilds all eleven failures with only code-allowlisted metadata", () => {
+      const expectedKeys: Record<ExternalError["code"], readonly string[]> = {
+        UNAUTHENTICATED: ["code"],
+        FORBIDDEN: ["code"],
+        INVALID_ARGUMENT: ["code", "fieldIssues"],
+        INVALID_REFERENCE: ["code", "fieldIssues"],
+        VALIDATION_FAILED: ["code", "fieldIssues"],
+        NOT_FOUND: ["code"],
+        DUPLICATE: ["code", "existingResourceId"],
+        CONFLICT: ["code", "currentRevision"],
+        INVALID_LIFECYCLE: ["code"],
+        CATALOG_UNAVAILABLE: ["code"],
+        INTERNAL_FAILURE: ["code"],
+      };
+
+      expect(safeFailures).toHaveLength(11);
+      for (const failure of safeFailures) {
+        const result = validateExternalFailure(failure);
+        expect(result).toEqual(failure);
+        expectFresh(failure, result);
+        expect(Object.keys(result.error)).toEqual(expectedKeys[failure.error.code]);
+      }
+    });
+
+    it("rebuilds omitted metadata from null-prototype failures", () => {
+      const codes = [
+        "UNAUTHENTICATED",
+        "FORBIDDEN",
+        "INVALID_ARGUMENT",
+        "INVALID_REFERENCE",
+        "VALIDATION_FAILED",
+        "NOT_FOUND",
+        "DUPLICATE",
+        "CONFLICT",
+        "INVALID_LIFECYCLE",
+        "CATALOG_UNAVAILABLE",
+        "INTERNAL_FAILURE",
+      ] as const;
+
+      for (const code of codes) {
+        const error = Object.create(null) as Record<string, unknown>;
+        error.code = code;
+        const failure = Object.create(null) as Record<string, unknown>;
+        failure.ok = false;
+        failure.error = error;
+        const result = validateExternalFailure(failure);
+        expect(result).toEqual({ ok: false, error: { code } });
+        expect(result.error).not.toBe(error);
+      }
+    });
+
+    it("rejects unknown, extra, and malformed failure shapes", () => {
+      const symbol = Symbol("platform-secret");
+      const symbolFailure = { ok: false, error: { code: "FORBIDDEN" } } as Record<
+        PropertyKey,
+        unknown
+      >;
+      symbolFailure[symbol] = "provider-secret";
+
+      const throwingFailures: unknown[] = [
+        {
+          get ok(): never {
+            throw new Error("stack-secret");
+          },
+        },
+        {
+          ok: false,
+          get error(): never {
+            throw new Error("provider-secret");
+          },
+        },
+        {
+          ok: false,
+          error: {
+            get code(): never {
+              throw new Error("internal-secret");
+            },
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            get fieldIssues(): never {
+              throw new Error("message-secret");
+            },
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [
+              {
+                get path(): never {
+                  throw new Error("authority-secret");
+                },
+                reason: "TYPE",
+              },
+            ],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "DUPLICATE",
+            get existingResourceId(): never {
+              throw new Error("persistence-secret");
+            },
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "CONFLICT",
+            get currentRevision(): never {
+              throw new Error("catalog-secret");
+            },
+          },
+        },
+      ];
+
+      const malformedFailures: unknown[] = [
+        null,
+        undefined,
+        [],
+        new Date(),
+        { ok: true, value: "not-a-failure" },
+        { ok: false },
+        { ok: false, error: null },
+        { ok: false, error: { code: "UNKNOWN" } },
+        { ok: false, error: { code: "FORBIDDEN", message: "secret" } },
+        { ok: false, error: { code: "FORBIDDEN", fieldIssues: [] } },
+        { ok: false, error: { code: "NOT_FOUND", details: "secret" } },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field", reason: "TYPE" }],
+            extra: true,
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "DUPLICATE",
+            existingResourceId: "resource-1",
+            currentRevision: 2,
+          },
+        },
+        {
+          ok: false,
+          error: { code: "CONFLICT", currentRevision: 2, existingResourceId: "resource-1" },
+        },
+        { ok: false, error: { code: "DUPLICATE", existingResourceId: "" } },
+        { ok: false, error: { code: "CONFLICT", currentRevision: -1 } },
+        { ok: false, error: { code: "CONFLICT", currentRevision: 1.5 } },
+        { ok: false, error: { code: "INVALID_ARGUMENT", fieldIssues: "not-an-array" } },
+        { ok: false, error: { code: "INVALID_ARGUMENT", fieldIssues: [null] } },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "", reason: "TYPE" }],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field\nsecret", reason: "TYPE" }],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field", reason: "UNKNOWN_REASON" }],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field", reason: "TYPE", value: "secret" }],
+          },
+        },
+        symbolFailure,
+        ...throwingFailures,
+      ];
+
+      for (const value of malformedFailures) {
+        expectInternalFailure(validateExternalFailure(value));
+      }
+    });
+
+    it("keeps serialized failures free of internal diagnostics", () => {
+      const secrets = [
+        "message-secret",
+        "stack-secret",
+        "provider-secret",
+        "authority-secret",
+        "platform-secret",
+        "internal-secret",
+      ];
+      const unsafeFailures: unknown[] = [
+        {
+          ok: false,
+          error: {
+            code: "FORBIDDEN",
+            message: secrets[0],
+            stack: secrets[1],
+            provider: secrets[2],
+            authority: secrets[3],
+            platform: secrets[4],
+            internal: secrets[5],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "DUPLICATE",
+            existingResourceId: "resource-1",
+            details: secrets.join("|"),
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field", reason: "TYPE", message: secrets[0] }],
+          },
+        },
+      ];
+
+      for (const value of unsafeFailures) {
+        const result = validateExternalFailure(value);
+        expectInternalFailure(result);
+        const serialized = JSON.stringify(result);
+        expect(serialized).not.toContain("secret");
+        expect(serialized).toBe('{"ok":false,"error":{"code":"INTERNAL_FAILURE"}}');
+      }
+
+      expect(JSON.stringify(validateExternalFailure(safeFailures[2]))).toBe(
+        '{"ok":false,"error":{"code":"INVALID_ARGUMENT","fieldIssues":[{"path":"resourceId","reason":"REQUIRED"}]}}',
+      );
+    });
+  });
 });
