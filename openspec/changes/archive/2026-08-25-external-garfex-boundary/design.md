@@ -381,3 +381,64 @@ Rejected because it creates an automatic publication mechanism, weakens per-oper
 
 Rejected because an external capability table would drift from Resource Master's deny-by-default map and could be mistaken for final enforcement. The edge authenticates and constructs an actor; Resource Master authorizes each direct application call before data access.
 
+### Selecting a transport now
+
+Rejected because no consumer, protocol, deployment, productive identity, or artifact distribution decision is gated. The normalized outcomes and named invocation functions are sufficient for a future HTTP, RPC, Convex, or other adapter without changing business semantics.
+
+### Sharing internal view objects because fields currently match
+
+Rejected because structural pass-through silently publishes future internal fields and preserves object identity. Explicit copying is verbose but makes compatibility changes reviewable and testable.
+
+### Parsing internal free-form error details into external field issues
+
+Rejected because current messages/details are not stable or safe. Only boundary request validation emits stable field issues; duplicate ID and conflict revision are the two reviewed internal metadata translations.
+
+## Rollout and rollback
+
+1. Land the independent contract and validators with no invocation or network reachability.
+2. Land trusted identity/error/projection code and ten named operations behind tests.
+3. Land compatibility fixtures, architecture fitness rules, and canonical docs.
+4. Run all focused and repository gates. Do not add a Convex or network entrypoint.
+5. A later transport change must separately decide authentication evidence, routing, protocol projection, deployment, and artifact distribution.
+
+Rollback removes the unexposed boundary directory, fixtures, rules, and docs without changing Resource Master, Convex persistence, or authorization. If a later transport exposes it, containment disables that transport/individual named route; Resource Master authorization must never be bypassed or weakened during rollback.
+
+## Changed-line forecast and work-unit boundaries
+
+Forecast is authored additions/edits, not generated output:
+
+| Area | Files | Forecast |
+| --- | ---: | ---: |
+| Independent contract and validators | 2 | 430–560 lines |
+| Trusted identity, errors, projections, ten operations | 5 | 620–820 lines |
+| Backend behavior/security tests | 3 | 650–850 lines |
+| Serialized compatibility fixture and parity tests | 3 | 320–430 lines |
+| Architecture checker, tests, valid/violation fixtures | 10–12 | 240–340 lines |
+| Canonical and linked documentation | 4 | 260–360 lines |
+| **Total** | **27–29** | **2,520–3,360 lines** |
+
+Likely strict-TDD review units, ordered to keep each unit coherent and independently reviewable:
+
+1. **Contract closure:** failing contract tests, independent DTOs, identifier constants, and request/outcome validators (about 550–750 changed lines).
+2. **Safe normalization:** failing security cases, trusted actor resolver, diagnostics seam, and complete error sanitization (about 400–550 lines).
+3. **Discovery reads:** failing mapper/projection cases plus taxonomy/schema/options/units/read/describe named operations (about 500–680 lines).
+4. **Search and mutations:** failing mapper/projection/authorization cases plus search/create/update/deactivate named operations (about 520–700 lines).
+5. **Compatibility defenses:** serialized fixture, all-operation/error parity, and documentation parity test (about 400–540 lines).
+6. **Architecture and docs:** controlled architecture fixtures/rules and the three linked documentation updates plus canonical document (about 500–700 lines).
+
+Six units are preferred over per-operation units: the named functions remain independently testable, while grouping shared projection/security mechanics avoids ten repetitive review chains. Tasks should split a unit only if its authored diff exceeds the repository's active review limit; no semantic shortcut or generic executor should be introduced to reduce line count.
+
+## Implementation checklist
+
+- [ ] Client-facing contract has no backend or third-party imports.
+- [ ] Exactly ten named operation functions exist and no generic business executor exists.
+- [ ] Every request validates before actor resolution and module work.
+- [ ] Actor construction reads only trusted server composition.
+- [ ] Every operation calls only the real same-named `ResourceMaster` method.
+- [ ] Resource Master remains the sole final authorization authority.
+- [ ] Every success and error is explicitly projected, validated, and newly allocated.
+- [ ] Unknown errors and all exceptions are sanitized and server-only diagnostics cannot fail outward.
+- [ ] Every operation has serialized success and failure evidence.
+- [ ] Architecture rules have both passing and named failing fixtures.
+- [ ] Documentation and executable identifiers remain in parity.
+- [ ] Convex and all listed technology decisions remain encapsulated/open.
