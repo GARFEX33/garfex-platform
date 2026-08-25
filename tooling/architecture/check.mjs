@@ -49,7 +49,7 @@ const targetsCounterpartPackage = (value) => {
 const quotedValues = (source) => [...source.matchAll(/(["'])([^"']+)\1/g)].map((match) => match[2]);
 const operationalValues = (source) => [
   ...quotedValues(source),
-  ...[...source.matchAll(/(?:^|[:\-]\s*)([^\s#"']+)/gm)].map((match) => match[1]),
+  ...[...source.matchAll(/(?:^|[:-]\s*)([^\s#"']+)/gm)].map((match) => match[1]),
 ];
 const nestedStringValues = (value) => {
   if (typeof value === "string") return [value];
@@ -168,6 +168,62 @@ const isBannedCoreDependency = (path) =>
   /(?:^|\/)convex\//.test(path) ||
   /(?:^|\/)_generated\//.test(path) ||
   /(?:^|\/)(?:infrastructure|deployment|ui|http|agents?)\//.test(path);
+const isExternalBoundarySource = (path) => /(?:^|\/)external-garfex-boundary\//.test(path);
+const isExternalClientContractSource = (path) =>
+  /(?:^|\/)external-garfex-boundary\/client-facing\//.test(path);
+const isExternalTrustedEdgeSource = (path) =>
+  /(?:^|\/)external-garfex-boundary\/trusted\//.test(path);
+const isExternalCompatibilityFixture = (path) =>
+  /(?:^|\/)apps\/backend\/tests\/fixtures\/external-garfex-boundary\//.test(path);
+const isExternalContractInternalImport = (specifier) =>
+  /(?:^|\/)(?:apps\/backend|resource-master|modules|auth|convex|_generated|persistence|infrastructure|application|domain|deployment)(?:\/|$)/i.test(
+    specifier,
+  );
+const isExternalPlatformImport = (specifier) =>
+  /(?:^|\/)(?:convex|_generated|generated|document|repository|persistence|deployment|catalog-admin)(?:\/|$)/i.test(
+    specifier,
+  );
+const hasExternalAuthorityField = (source) =>
+  /(?:^|[,{;\n])\s*(?:readonly\s+)?(?:actor|actorId|role|roles|capability|capabilities|claim|claims|token|credential|credentials|session|provider|providerId|providerSubject|providerClaims|authentication|authorization)\s*\??\s*:/m.test(
+    source,
+  );
+const hasExternalAuthorityType = (source) =>
+  /\b(?:ActorContext|ActorId|ProviderClaims|ProviderIdentity|ProviderSubject|ConvexIdentity|SessionIdentity|Role|Capability)\b/.test(
+    source,
+  );
+const hasExternalPlatformContract = (source) =>
+  /\b(?:Doc|DocumentId|ConvexId|Generated(?:Api|Binding|Document)?|Persistence(?:Record|Document)?|Repository(?:Record|Port)?|Deployment(?:Config|Payload)?|CatalogAdmin(?:istration)?(?:Config|Payload)?)\b/.test(
+    source,
+  ) ||
+  /(?:^|[,{;\n])\s*["']?(?:document|documentId|convexId|persistence|deployment|catalogAdmin)["']?\s*\??\s*:/m.test(
+    source,
+  );
+const hasExternalDerivation = (source) =>
+  /\b(?:Pick|Omit|Parameters|ReturnType)\s*<[^;\n]*(?:ResourceMaster|resource[- ]?master|Convex|convex|Generated|_generated)[^;\n]*>/.test(
+    source,
+  ) ||
+  /\b(?:keyof|typeof)\s+(?:ResourceMaster|resourceMaster|Convex|convex|generated)\b/.test(source);
+const hasExternalGenericBusinessSurface = (source) =>
+  /\bexport\s+(?:(?:async|default)\s+)*(?:function|class)\s+(?:execute|dispatch|runOperation|invokeOperation|handleOperation|create|read|update|delete|list|crud|repository|table|registry)\b/.test(
+    source,
+  ) ||
+  /\bexport\s+(?:const|let|var)\s+(?:execute|dispatch|runOperation|invokeOperation|handleOperation|crud|repository|table|operationHandlers|operationMap|operationRegistry|handlerRegistry)\b/.test(
+    source,
+  ) ||
+  /\b(?:operationHandlers|operationMap|operationRegistry|handlerRegistry)\b/.test(source) ||
+  /\b(?:Object\.(?:keys|values|entries)|Reflect\.ownKeys)\s*\(\s*resourceMaster\b/.test(source);
+const isExternalTransportImport = (specifier) =>
+  /^(?:node:)?(?:http|https|http2|net|tls|server|express|fastify|hono|koa|router|rpc|grpc|trpc|convex)(?:[/:@-]|$)/i.test(
+    specifier,
+  );
+const hasExternalTransportFraming = (source) =>
+  /\b(?:statusCode|httpStatus|protocol|route|router|rpcMethod|httpMethod)\s*(?:\?|:|=)/.test(
+    source,
+  );
+const isExternalTrustedForbiddenTarget = (path) =>
+  /(?:^|\/)(?:resource-master\/(?:domain|application|infrastructure|deployment)|convex|_generated|persistence|infrastructure|deployment|domain|application)(?:\/|$)/.test(
+    path,
+  ) || /(?:^|\/)auth\/(?!composition\.[cm]?[jt]s$)/.test(path);
 const isClientFacingSource = (path) => /(?:^|\/)client-facing(?:\/|\.|$)/.test(path);
 const importSpecifiers = (source) =>
   [...source.matchAll(/(?:from\s*|import\s*(?:\(\s*)?|require\s*\()(["'])([^"']+)\1/g)].map(
@@ -216,6 +272,9 @@ for (const module of report.modules ?? []) {
     const to = normalize(relative(root, dependency.resolved));
     const toModule = moduleName(to);
 
+    if (isExternalTrustedEdgeSource(from) && isExternalTrustedForbiddenTarget(to)) {
+      addViolation("external-trusted-edge-public-only", from, to);
+    }
     if (isResourceDomain(from) && isAuthModule(to)) {
       addViolation("resource-domain-no-auth", from, to);
     }
@@ -416,6 +475,38 @@ const scan = (scanRoot, current = scanRoot) => {
         addViolation("client-facing-no-trusted-auth-internals", from, "<source>");
       }
     }
+    if (isExternalClientContractSource(from)) {
+      const internalImport = specifiers.find(isExternalContractInternalImport);
+      if (internalImport !== undefined) {
+        addViolation("external-contract-independent", from, internalImport);
+      }
+      if (
+        hasExternalAuthorityField(source) ||
+        hasExternalAuthorityType(source) ||
+        specifiers.some((specifier) => /(?:^|\/)(?:auth|authorization)(?:\/|$)/i.test(specifier))
+      ) {
+        addViolation("external-contract-no-authority", from, "<source>");
+      }
+      const platformImport = specifiers.find(isExternalPlatformImport);
+      if (platformImport !== undefined || hasExternalPlatformContract(source)) {
+        addViolation("external-contract-no-platform", from, platformImport ?? "<source>");
+      }
+      if (hasExternalDerivation(source)) {
+        addViolation("external-no-automatic-derivation", from, "<source>");
+      }
+    }
+    if (isExternalBoundarySource(from)) {
+      const transportImport = specifiers.find(isExternalTransportImport);
+      if (transportImport !== undefined || hasExternalTransportFraming(source)) {
+        addViolation("external-no-transport", from, transportImport ?? "<source>");
+      }
+      if (hasExternalGenericBusinessSurface(source)) {
+        addViolation("external-no-generic-business-executor", from, "<source>");
+      }
+    }
+  }
+  if (isExternalCompatibilityFixture(from) && hasExternalPlatformContract(source)) {
+    addViolation("external-contract-no-platform", from, "<source>");
   }
 
   if (isPackageManifest) {
