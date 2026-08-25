@@ -503,6 +503,156 @@ describe("external GARFEX named read invocations", () => {
     const result = await runRead(readCases[0] as ReadCase, {}, methods, async () => readActor);
     expect(result).toEqual({ ok: false, error: { code: "INTERNAL_FAILURE" } });
   });
+
+  it.each([
+    readCase(
+      operations.invokeExternalGetResource,
+      "getResource",
+      { resourceId: "resource-1" },
+      { ...resourceReadSuccess, resourceId: "" },
+    ),
+    readCase(
+      operations.invokeExternalDescribeResource,
+      "describeResource",
+      { resourceId: "resource-1" },
+      { ...descriptionReadSuccess, resourceId: "" },
+    ),
+  ])("$name contains an invalid projected success before release", async (testCase) => {
+    const methods = readMethodSpies();
+    methods[testCase.method] = vi.fn(async () => ({ ok: true, value: testCase.internal }) as never);
+    const result = await runRead(testCase, testCase.request, methods, async () => readActor);
+    expect(result).toEqual({ ok: false, error: { code: "INTERNAL_FAILURE" } });
+  });
+});
+
+describe("external GARFEX U6b authorization handoff", () => {
+  it.each([
+    ["getResource", operations.invokeExternalGetResource],
+    ["describeResource", operations.invokeExternalDescribeResource],
+  ] as const)("lets Resource Master deny %s before downstream data work", async (_name, invoke) => {
+    const loadSnapshot = vi.fn();
+    const getByResourceId = vi.fn();
+    const repository = { getByResourceId } as unknown as ResourceRepository;
+    const resourceMaster = createResourceMaster({
+      catalogReader: { loadSnapshot },
+      repository,
+    });
+    const resolveActor = vi.fn(
+      async () =>
+        ({
+          actorId: "server-unauthorized-actor" as ActorId,
+          capabilities: new Set(),
+        }) as ActorContext,
+    );
+
+    const result = await invoke(
+      { resourceId: "protected-resource" },
+      { actorResolver: { resolveActor }, resourceMaster },
+    );
+
+    expect(result).toEqual({ ok: false, error: { code: "FORBIDDEN" } });
+    expect(resolveActor).toHaveBeenCalledOnce();
+    expect(loadSnapshot).not.toHaveBeenCalled();
+    expect(getByResourceId).not.toHaveBeenCalled();
+  });
+});
+
+describe("external GARFEX U7 search invocation", () => {
+  const opaqueCursor = "opaque|cursor-v2|private-state";
+
+  it("keeps omitted lifecycle, limit, and cursor absent and calls only searchResources once", async () => {
+    const methods = readMethodSpies();
+    methods.searchResources = vi.fn(
+      async () => ({ ok: true, value: searchSuccess(null) }) as never,
+    );
+    const request = { terms: "wire" };
+    const resolveActor = vi.fn(async () => readActor);
+
+    const result = await runRead(searchReadCase, request, methods, resolveActor);
+
+    expect(result).toEqual({ ok: true, value: searchSuccess(null) });
+    expect(methods.searchResources).toHaveBeenCalledOnce();
+    const args = methods.searchResources.mock.calls[0] as unknown[];
+    expect(args[0]).toBe(readActor);
+    expect(args[1]).toEqual(request);
+    expect(args[1]).not.toBe(request);
+    expect(Object.keys(args[1] as Record<string, unknown>)).toEqual(["terms"]);
+    expect(Object.hasOwn(args[1] as object, "lifecycle")).toBe(false);
+    expect(Object.hasOwn(args[1] as object, "limit")).toBe(false);
+    expect(Object.hasOwn(args[1] as object, "cursor")).toBe(false);
+    for (const [method, spy] of Object.entries(methods)) {
+      if (method !== "searchResources") expect(spy).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each([
+    {
+      name: "bounded lower limit",
+      request: { terms: "wire", limit: 1 },
+      expected: { terms: "wire", limit: 1 },
+      resultCursor: null,
+    },
+    {
+      name: "bounded upper limit with explicit null cursor",
+      request: { terms: "wire", limit: 50, cursor: null },
+      expected: { terms: "wire", limit: 50, cursor: null },
+      resultCursor: null,
+    },
+    {
+      name: "opaque continuation cursor",
+      request: { terms: "wire", lifecycle: "INACTIVE", limit: 3, cursor: opaqueCursor },
+      expected: { terms: "wire", lifecycle: "INACTIVE", limit: 3, cursor: opaqueCursor },
+      resultCursor: opaqueCursor,
+    },
+  ])("preserves supplied search options for $name", async ({ request, expected, resultCursor }) => {
+    const methods = readMethodSpies();
+    methods.searchResources = vi.fn(
+      async () => ({ ok: true, value: searchSuccess(resultCursor) }) as never,
+    );
+
+    const result = await runRead(searchReadCase, request, methods, async () => readActor);
+
+    expect(result).toEqual({ ok: true, value: searchSuccess(resultCursor) });
+    expect(methods.searchResources).toHaveBeenCalledOnce();
+    const args = methods.searchResources.mock.calls[0] as unknown[];
+    expect(args[1]).toEqual(expected);
+    expect(args[1]).not.toBe(request);
+  });
+
+  it.each([
+    { request: { terms: "wire", lifecycle: "BROKEN" }, path: "lifecycle", reason: "INVALID_VALUE" },
+    { request: { terms: "wire", limit: 0 }, path: "limit", reason: "OUT_OF_RANGE" },
+    { request: { terms: "wire", limit: 51 }, path: "limit", reason: "OUT_OF_RANGE" },
+    { request: { terms: "wire", cursor: 12 }, path: "cursor", reason: "TYPE" },
+    { request: { terms: "wire", cursor: "" }, path: "cursor", reason: "INVALID_VALUE" },
+  ] as const)(
+    "rejects malformed pagination in $path before auth or module work",
+    async ({ request, path, reason }) => {
+      const methods = readMethodSpies();
+      const resolveActor = vi.fn(async () => readActor);
+
+      const result = await runRead(searchReadCase, request, methods, resolveActor);
+
+      expect(result).toEqual({
+        ok: false,
+        error: { code: "INVALID_ARGUMENT", fieldIssues: [{ path, reason }] },
+      });
+      expect(resolveActor).not.toHaveBeenCalled();
+      for (const spy of Object.values(methods)) expect(spy).not.toHaveBeenCalled();
+    },
+  );
+
+  it("contains a malformed projected page before release", async () => {
+    const methods = readMethodSpies();
+    methods.searchResources = vi.fn(
+      async () => ({ ok: true, value: { items: [], cursor: 12 } }) as never,
+    );
+
+    const result = await runRead(searchReadCase, { terms: "wire" }, methods, async () => readActor);
+
+    expect(result).toEqual({ ok: false, error: { code: "INTERNAL_FAILURE" } });
+    expect(methods.searchResources).toHaveBeenCalledOnce();
+  });
 });
 
 type MutationMethod = "createResource" | "updateNonIdentityData" | "deactivateResource";
@@ -575,3 +725,34 @@ const mutationActor = {
   actorId: "server-mutation-actor" as ActorId,
   capabilities: new Set(["resource:create"]),
 } as ActorContext;
+
+describe("external GARFEX named mutation invocations", () => {
+  it.each(mutationCases)(
+    "$method validates, rebuilds, and calls only its matching method",
+    async (testCase) => {
+      const methods = mutationMethodSpies();
+      methods[testCase.method] = vi.fn(async () => ({
+        ok: true,
+        value: resourceReadSuccess,
+      })) as never;
+      const request = testCase.request;
+      const result = await runMutation(testCase, request, methods, async () => mutationActor);
+
+      expect(result).toEqual({ ok: true, value: resourceReadSuccess });
+      expect(methods[testCase.method]).toHaveBeenCalledOnce();
+      const args = methods[testCase.method].mock.calls[0] as unknown[];
+      expect(args[0]).toBe(mutationActor);
+      expect(args[1]).toEqual(testCase.mappedInput);
+      expect(args[1]).not.toBe(request);
+      expect(args[1]).not.toHaveProperty("actorId");
+      if (testCase.method === "createResource") {
+        const input = args[1] as { attributes: Record<string, unknown> };
+        expect(input.attributes).not.toBe(request.attributes);
+        expect(input.attributes.gauge).not.toBe(mutationAttribute);
+      }
+      for (const [method, spy] of Object.entries(methods)) {
+        if (method !== testCase.method) expect(spy).not.toHaveBeenCalled();
+      }
+    },
+  );
+});
