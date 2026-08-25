@@ -761,3 +761,408 @@ Status: completed; U7 and all later implementation units remain deferred to the 
 
 - [ ] After the final validation gate, confirm deviations and unexecuted checks are recorded for the SDD archive and close the lifecycle only if the forbidden-scope guardrails remain true. <!-- sdd-owner: parent -->
 
+## U7 — Search with opaque bounded pagination
+
+Status: completed; this apply executed only U7. U8–U11, final validation, verify, sync, archive, and parent-owned lifecycle work remain deferred.
+
+### TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Add U7 search cases | `apps/backend/tests/external-garfex-operations.test.ts` | Trusted-edge unit seam | 32/32 baseline tests passed | 14 expected failures while the named export was absent; U6 tests remained green | 46/46 focused tests passed | Omitted, nullable, opaque, bounded, malformed, final-null, and exclusivity cases passed | Final focused tests passed after formatting cleanup |
+| Implement `invokeExternalSearchResources` | `apps/backend/src/external-garfex-boundary/trusted/read-operations.ts` | Trusted application edge | Existing six read wrappers remained green | Tests referenced the absent function before production edits | 46/46 focused tests passed with direct search mapping | Conditional input construction, direct call, projection, and response containment passed | Explicit search-only mapping remained readable and Biome-clean |
+| Triangulate pagination and authorization | `apps/backend/tests/resource-master.test.ts`, `apps/backend/tests/resource-master-authorization.test.ts` | Application integration boundary | Existing Resource Master suites were available | N/A after the U7 cases specified the seam | N/A | Search/cursor cases: 3 passed; authorization cases: 7 passed; no cursor decoding/encoding/interpretation found in the trusted wrapper | Final operation, pagination, authorization, typecheck, and lint checks passed |
+| Refactor and verification | Same two TypeScript files | Repository unit | 46/46 focused tests passed | N/A after behavior was established | N/A | Package backend command passed 14 files and 192 tests | Biome formatting applied one style-only test cleanup; final format/lint passed |
+
+### Implementation evidence
+
+- Added only the seventh named trusted read wrapper, `invokeExternalSearchResources`, and its U7 operation cases; U6a/U6b wrappers and shared helpers were preserved.
+- The wrapper validates the external request before authentication, returns validated invalid-request failures without resolving identity or invoking Resource Master, resolves a trusted actor, and calls only `resourceMaster.searchResources(actor, input)` once.
+- The mapped input always rebuilds `terms` and conditionally includes only supplied lifecycle, limit, and cursor values. Omitted optionals remain absent, explicit `null` remains `null`, and the opaque cursor is copied without decoding, construction, splitting, or interpretation.
+- Search successes are projected through `projectExternalSearchResources` and validated with `validateExternalSearchResourcesSuccess`; Resource Master failures, invocation exceptions, projection failures, and malformed outward pages remain contained by the existing trusted boundary helpers.
+- No selector, map, registry, generic executor, edge capability table, transport, cursor helper, persistence, Convex, consumer, mutation, or U8 code was added.
+
+### Files, workload, and boundary
+
+- Changed implementation: `apps/backend/src/external-garfex-boundary/trusted/read-operations.ts`.
+- Changed tests: `apps/backend/tests/external-garfex-operations.test.ts`.
+- Updated persisted artifacts: `openspec/changes/external-garfex-boundary/tasks.md` and this cumulative progress artifact; all four U7 implementation-owned rows are checked `[x]`.
+- The feature-branch-chain boundary is U7 only, with approximately 170 authored TypeScript additions and no generated artifacts, within the 400-line slice budget; no size exception was used.
+- Rollback is limited to the U7 search wrapper, U7 operation assertions, and their task/progress bookkeeping. Resource Master, authentication, projections, validators, errors, Convex, persistence, and infrastructure behavior remain unchanged.
+- No commit, branch, push, PR, review, receipt, transport, consumer, deployment, release, or U8 action was performed.
+
+### Verification commands
+
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/external-garfex-operations.test.ts` — exit 0; 1 file and 46 tests passed.
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/resource-master.test.ts -t 'search|cursor'` — exit 0; 3 selected tests passed and 17 were skipped.
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/resource-master-authorization.test.ts` — exit 0; 1 file and 7 tests passed.
+- `corepack pnpm --filter @garfex/backend test -- external-garfex-operations.test.ts` — exit 0; the package script ran 14 backend files and 192 tests, all passed rather than isolating only the named file.
+- `corepack pnpm --filter @garfex/backend typecheck` — exit 0; no diagnostics.
+- `corepack pnpm exec biome format apps/backend/src/external-garfex-boundary/trusted/read-operations.ts apps/backend/tests/external-garfex-operations.test.ts` — exit 0; both files checked without fixes after the refactor.
+- `corepack pnpm exec biome lint apps/backend/src/external-garfex-boundary/trusted/read-operations.ts apps/backend/tests/external-garfex-operations.test.ts` — exit 0; both files checked without fixes.
+- A read-only source inspection found no cursor decoding, encoding, splitting, construction, or interpretation in `trusted/read-operations.ts`.
+- Full repository tests, architecture tests, build, `corepack pnpm check`, U8+, final validation, verify, sync, archive, and delivery gates remain intentionally unexecuted.
+
+### Deviations and structured status
+
+- No semantic deviation from the design occurred. Biome applied one formatting-only refactor to the U7 malformed-pagination test; all focused behavior remained unchanged.
+- Consumed native `gentle-ai sdd-status` for `external-garfex-boundary`: `artifactStore: openspec`, proposal/spec/design/tasks/apply-progress present, `applyState: ready`, `dependencies.apply: ready`, `dependencies.verify: blocked`, `dependencies.archive: blocked`, `nextRecommended: apply`, and no blocked reasons.
+- Consumed `actionContext.mode: repo-local`, workspace root `/home/garfex/PROGRAMACION/garfex-platform`, allowed edit root the same, and no action-context warnings or edit-root violations.
+- Consumed the resolved workload path `chain strategy: feature-branch-chain` with `Decision needed before apply: No`, `Chained PRs recommended: Yes`, and no `size:exception` approval.
+- Native status after checkbox reconciliation reports 66 task rows, 45 complete and 21 pending, `applyState: ready`, and `nextRecommended: apply`; this phase returns `parent-lifecycle`, not U8, verify, review, receipt, sync, archive, or delivery.
+
+### Current exact unchecked task rows after U7
+
+- [ ] Add failing mutation cases in `apps/backend/tests/external-garfex-operations.test.ts` and `apps/backend/tests/external-garfex-security.test.ts` for rebuilt create attributes, resource ID/revision/unit mapping, exactly-one direct method calls, forged authority rejection, and each mutation's missing-neighbor-capability forbidden path with downstream spies untouched. <!-- sdd-owner: implementation -->
+- [ ] Implement the three named functions in `apps/backend/src/external-garfex-boundary/trusted/mutation-operations.ts`, validating before authentication, rebuilding all internal inputs, passing the trusted actor separately, calling only the matching public method, and using named success/error projection paths. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test -- external-garfex-operations.test.ts external-garfex-security.test.ts` and the relevant `apps/backend/tests/resource-master-authorization.test.ts` cases, proving no edge capability table duplicates or replaces `resource-master/application/authorization.ts`. <!-- sdd-owner: implementation -->
+- [ ] Remove only accidental duplication between mutation wrappers in `apps/backend/src/external-garfex-boundary/trusted/mutation-operations.ts` through private boundary-local helpers, retain three named direct calls, and rerun operation/security tests plus backend typecheck. <!-- sdd-owner: implementation -->
+- [ ] Add the failing fixture-parity harness in `apps/backend/tests/external-garfex-compatibility.test.ts` before the fixture exists, asserting ten operation entries, request/success/failure validation, eleven error metadata forms, and serialized deep equality. <!-- sdd-owner: implementation -->
+- [ ] Add `apps/backend/tests/fixtures/external-garfex-boundary/compatibility.json` and complete the parity test with representative safe values, applicable failures, null/opaque cursor cases, validator-backed fixture loading, and no internal messages, stacks, provider data, Convex IDs, persistence records, or deployment/catalog-admin values. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test -- external-garfex-compatibility.test.ts` and the full backend test suite, proving JSON round-trip identity, one-to-one operation coverage, allowlisted metadata, and drift failure when fixture-visible fields are changed without an intentional fixture update. <!-- sdd-owner: implementation -->
+- [ ] Make traversal deterministic in `apps/backend/tests/external-garfex-compatibility.test.ts` and keep `apps/backend/tests/fixtures/external-garfex-boundary/compatibility.json` as repository test evidence only; rerun compatibility, operation, security, and contract tests without selecting a wire format or generation direction. <!-- sdd-owner: implementation -->
+- [ ] Extend `tooling/tests/architecture.test.ts` with failing expectations for all seven rule names, a valid independent-contract fixture, a valid trusted-public-edge fixture, and these violations: `internal-import.ts`, `authority-field.ts`, `platform-leak.ts`, `trusted-internal-import.ts`, `generic-executor.ts`, `automatic-derivation.ts`, and `transport-import.ts`. <!-- sdd-owner: implementation -->
+- [ ] Update `tooling/architecture/check.mjs` with narrowly scoped import/syntax checks and add the valid/violating fixtures under `tooling/architecture-fixtures/valid/external-garfex-boundary/` and `tooling/architecture-fixtures/violations/external-garfex-boundary/`; keep trusted imports limited to public Resource Master/auth composition and reject Convex, persistence, deployment, transport, derivation, and generic business publication. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm test:architecture` and inspect the checker output for every named fixture, proving existing `external-client-boundary` protections remain green and the new rules do not rely on broad repository-wide keyword bans. <!-- sdd-owner: implementation -->
+- [ ] Refine rule diagnostics and fixture names in `tooling/architecture/check.mjs` and `tooling/tests/architecture.test.ts` so each violation fails for its intended rule only; rerun architecture tests and full typecheck. <!-- sdd-owner: implementation -->
+- [ ] Add the failing parser/assertions in `apps/backend/tests/external-garfex-documentation-parity.test.ts` for the exact ten operation rows, direct mappings, eleven error codes, allowlisted metadata names, and required non-decision statements before the canonical document is complete. <!-- sdd-owner: implementation -->
+- [ ] Create `docs/external-garfex-boundary.md` with the lead distinction `External Client Contract != Resource Master Public Application Contract`, exact operation/mapping/request/success/error tables, trusted identity flow, final module authorization, compatibility ownership, fixture/check commands, Convex isolation, and transport/IdP/schema/SDK/consumer non-decisions; update `docs/architecture.md`, `docs/external-client-boundary.md`, and `docs/auth-boundary.md` with links and dependency arrows only. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test -- external-garfex-documentation-parity.test.ts external-garfex-compatibility.test.ts` and `corepack pnpm test:architecture`, proving documented identifiers, direct mappings, metadata, and non-decisions agree without presenting JSON fixtures as a selected transport. <!-- sdd-owner: implementation -->
+- [ ] Apply progressive disclosure and review-oriented tables to `docs/external-garfex-boundary.md`, `docs/architecture.md`, `docs/external-client-boundary.md`, and `docs/auth-boundary.md`, remove duplicated contradictory semantics, preserve repository independence and deferred packaging, and rerun documentation parity plus the relevant focused tests. <!-- sdd-owner: implementation -->
+- [ ] Run the strict repository test command `corepack pnpm test` and record the exact Vitest result, including coverage completion. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test`, `corepack pnpm --filter @garfex/backend typecheck`, `corepack pnpm test:architecture`, and `corepack pnpm build`; record each exact result and any unexecuted check. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm check` and inspect `git diff --stat` plus `git diff --numstat` for the selected work unit/PR, confirming authored additions plus deletions stay within 400 lines per slice and no transport, SDK, productive IdP, Convex exposure, universal executor, or internal contract publication slipped in. <!-- sdd-owner: implementation -->
+- [ ] Verify rollback boundaries against `apps/backend/src/resource-master/`, `apps/backend/src/auth/`, `apps/backend/convex/`, and persistence/infrastructure files, confirming the change can be disabled without weakening Resource Master authorization or changing Convex persistence behavior. <!-- sdd-owner: implementation -->
+- [ ] After the final validation gate, confirm deviations and unexecuted checks are recorded for the SDD archive and close the lifecycle only if the forbidden-scope guardrails remain true. <!-- sdd-owner: parent -->
+
+## U8 — Correct explicit trusted entrypoint names
+
+Status: completed bounded correction after the parent gate rejected naming drift; U8 behavior and persisted U8 checkboxes were preserved.
+
+### Gate failure and diagnosis
+
+The parent gate inspected the actual trusted mutation module after the original U8 implementation and found that it exported `createResource`, `updateNonIdentityData`, and `deactivateResource`. The approved design requires the visibly distinct trusted entrypoints `invokeExternalCreateResource`, `invokeExternalUpdateNonIdentityData`, and `invokeExternalDeactivateResource`. The old trusted names were not retained as aliases. Resource Master method names and external operation identifiers remain unchanged because they are the approved one-to-one module mapping targets.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+| --- | --- | --- |
+| RED | Renamed all U8 test references to the approved trusted names before changing production code, then ran `corepack pnpm --filter @garfex/backend exec vitest run tests/external-garfex-operations.test.ts tests/external-garfex-security.test.ts`. | Expected failure: 2 files ran with 77 tests; 6 mutation tests failed with `TypeError` because the new trusted exports were absent, while 71 tests passed. |
+| GREEN | Renamed exactly the three exported declarations in `trusted/mutation-operations.ts`; no aliases or behavior changes were added. | Passed: the same 2 focused files, 77/77 tests. |
+| TRIANGULATE | Ran operation, security, and Resource Master authorization tests; backend typecheck; Biome format/lint; and stale-reference/export inspection. | Passed: 3 files and 84/84 tests; typecheck clean; Biome checked 3 files without fixes; exactly the three approved trusted exports were present and no `mutations.<oldName>` references remained. |
+| REFACTOR | Re-ran non-writing Biome checks after the name-only correction and retained the existing direct module calls and projection/error paths. | Passed with no formatting or lint fixes and no semantic refactor required. |
+
+### Correction evidence
+
+- Changed `apps/backend/src/external-garfex-boundary/trusted/mutation-operations.ts` exports to exactly `invokeExternalCreateResource`, `invokeExternalUpdateNonIdentityData`, and `invokeExternalDeactivateResource`.
+- Updated the U8 references in `apps/backend/tests/external-garfex-operations.test.ts` and `apps/backend/tests/external-garfex-security.test.ts` to use only the approved names.
+- No old trusted export alias exists; the old names appear only where the external operation vocabulary and matching Resource Master application methods are intentionally defined or invoked.
+- No transport, consumer, deployment, Convex entrypoint, U9 work, commit, branch, push, PR, review, receipt, or delivery action was performed.
+
+### Files, workload, and persisted task state
+
+- Changed implementation/test files: `apps/backend/src/external-garfex-boundary/trusted/mutation-operations.ts`, `apps/backend/tests/external-garfex-operations.test.ts`, and `apps/backend/tests/external-garfex-security.test.ts`.
+- The correction replaced 9 authored TypeScript lines (18 additions plus deletions), below the native 80-line correction budget and the feature-branch-chain boundary; no size exception was used.
+- U8 task checkboxes were already `[x]` and were deliberately left unchanged, preserving the four persisted U8 completion rows. No new implementation task was introduced or marked.
+- The native attempt for `U8-explicit-export-name-correction` settled `complete` with evidence revision `sha256:5655ece00c2abaf94aacd3be6165e423394fe7e57abb3b7fe4abf5c15d5083cb`.
+
+### Structured status consumed and produced
+
+- Consumed native `gentle-ai.sdd-status` for `external-garfex-boundary`: `artifactStore: openspec`, `applyState: ready`, `dependencies.apply: ready`, `nextRecommended: apply`, and no blocked reasons.
+- Consumed `actionContext.mode: repo-local`, workspace root `/home/garfex/PROGRAMACION/garfex-platform`, allowed edit root the same, and no action-context warnings or edit-root violations.
+- Consumed the resolved workload path `chain strategy: feature-branch-chain` with `Decision needed before apply: No`, `Chained PRs recommended: Yes`, and no `size:exception` approval.
+- The read-only CodeGraph MCP proxy was unavailable and its CLI index did not include the untracked mutation module, so targeted filesystem reads were used only after the CodeGraph attempt; no broad structural assumption was used.
+- Current route remains `parent-lifecycle`; verify, U9, sync, archive, and delivery gates are not ready because implementation rows remain unchecked.
+
+### Current exact unchecked implementation and parent rows
+
+- [ ] Add the failing fixture-parity harness in `apps/backend/tests/external-garfex-compatibility.test.ts` before the fixture exists, asserting ten operation entries, request/success/failure validation, eleven error metadata forms, and serialized deep equality. <!-- sdd-owner: implementation -->
+- [ ] Add `apps/backend/tests/fixtures/external-garfex-boundary/compatibility.json` and complete the parity test with representative safe values, applicable failures, null/opaque cursor cases, validator-backed fixture loading, and no internal messages, stacks, provider data, Convex IDs, persistence records, or deployment/catalog-admin values. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test -- external-garfex-compatibility.test.ts` and the full backend test suite, proving JSON round-trip identity, one-to-one operation coverage, allowlisted metadata, and drift failure when fixture-visible fields are changed without an intentional fixture update. <!-- sdd-owner: implementation -->
+- [ ] Make traversal deterministic in `apps/backend/tests/external-garfex-compatibility.test.ts` and keep `apps/backend/tests/fixtures/external-garfex-boundary/compatibility.json` as repository test evidence only; rerun compatibility, operation, security, and contract tests without selecting a wire format or generation direction. <!-- sdd-owner: implementation -->
+- [ ] Extend `tooling/tests/architecture.test.ts` with failing expectations for all seven rule names, a valid independent-contract fixture, a valid trusted-public-edge fixture, and these violations: `internal-import.ts`, `authority-field.ts`, `platform-leak.ts`, `trusted-internal-import.ts`, `generic-executor.ts`, `automatic-derivation.ts`, and `transport-import.ts`. <!-- sdd-owner: implementation -->
+- [ ] Update `tooling/architecture/check.mjs` with narrowly scoped import/syntax checks and add the valid/violating fixtures under `tooling/architecture-fixtures/valid/external-garfex-boundary/` and `tooling/architecture-fixtures/violations/external-garfex-boundary/`; keep trusted imports limited to public Resource Master/auth composition and reject Convex, persistence, deployment, transport, derivation, and generic business publication. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm test:architecture` and inspect the checker output for every named fixture, proving existing `external-client-boundary` protections remain green and the new rules do not rely on broad repository-wide keyword bans. <!-- sdd-owner: implementation -->
+- [ ] Refine rule diagnostics and fixture names in `tooling/architecture/check.mjs` and `tooling/tests/architecture.test.ts` so each violation fails for its intended rule only; rerun architecture tests and full typecheck. <!-- sdd-owner: implementation -->
+- [ ] Add the failing parser/assertions in `apps/backend/tests/external-garfex-documentation-parity.test.ts` for the exact ten operation rows, direct mappings, eleven error codes, allowlisted metadata names, and required non-decision statements before the canonical document is complete. <!-- sdd-owner: implementation -->
+- [ ] Create `docs/external-garfex-boundary.md` with the lead distinction `External Client Contract != Resource Master Public Application Contract`, exact operation/mapping/request/success/error tables, trusted identity flow, final module authorization, compatibility ownership, fixture/check commands, Convex isolation, and transport/IdP/schema/SDK/consumer non-decisions; update `docs/architecture.md`, `docs/external-client-boundary.md`, and `docs/auth-boundary.md` with links and dependency arrows only. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test -- external-garfex-documentation-parity.test.ts external-garfex-compatibility.test.ts` and `corepack pnpm test:architecture`, proving documented identifiers, direct mappings, metadata, and non-decisions agree without presenting JSON fixtures as a selected transport. <!-- sdd-owner: implementation -->
+- [ ] Apply progressive disclosure and review-oriented tables to `docs/external-garfex-boundary.md`, `docs/architecture.md`, `docs/external-client-boundary.md`, and `docs/auth-boundary.md`, remove duplicated contradictory semantics, preserve repository independence and deferred packaging, and rerun documentation parity plus the relevant focused tests. <!-- sdd-owner: implementation -->
+- [ ] Run the strict repository test command `corepack pnpm test` and record the exact Vitest result, including coverage completion. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test`, `corepack pnpm --filter @garfex/backend typecheck`, `corepack pnpm test:architecture`, and `corepack pnpm build`; record each exact result and any unexecuted check. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm check` and inspect `git diff --stat` plus `git diff --numstat` for the selected work unit/PR, confirming authored additions plus deletions stay within 400 lines per slice and no transport, SDK, productive IdP, Convex exposure, universal executor, or internal contract publication slipped in. <!-- sdd-owner: implementation -->
+- [ ] Verify rollback boundaries against `apps/backend/src/resource-master/`, `apps/backend/src/auth/`, `apps/backend/convex/`, and persistence/infrastructure files, confirming the change can be disabled without weakening Resource Master authorization or changing Convex persistence behavior. <!-- sdd-owner: implementation -->
+- [ ] After the final validation gate, confirm deviations and unexecuted checks are recorded for the SDD archive and close the lifecycle only if the forbidden-scope guardrails remain true. <!-- sdd-owner: parent -->
+
+## U9 — Serialized compatibility and operation parity
+
+Status: completed; U10 and later implementation work remains deferred to the parent lifecycle.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+| --- | --- | --- |
+| RED | Wrote `apps/backend/tests/external-garfex-compatibility.test.ts` before the fixture existed and ran `corepack pnpm --filter @garfex/backend exec vitest run tests/external-garfex-compatibility.test.ts`. | Failed as intended: 1 file and 14 tests failed with the missing compatibility JSON. |
+| GREEN | Added the repository-only compatibility fixture and wired the validator-backed named stubs. | Passed: 1 file and 14 tests; every operation request/success/failure path and the eleven-code matrix validated. |
+| TRIANGULATE | Ran the compatibility test, the combined contract/operation/security tests, the exact task command, and the full backend suite. | Passed: compatibility 1 file/13 tests; combined 3 files/96 tests; exact package command 15 files/211 tests; full backend 15 files/211 tests. |
+| REFACTOR | Made operation traversal deterministic, kept named method mappings explicit, formatted the TypeScript harness, and retained JSON as test evidence only. | Passed: final compatibility, focused suites, backend typecheck, Biome format/lint, and JSON parse checks. |
+
+### Implementation evidence
+
+- Added `apps/backend/tests/fixtures/external-garfex-boundary/compatibility.json` with valid request, representative success, and applicable failure evidence for all ten operations.
+- Added the complete eleven-code matrix with field-issue metadata for the three corrective codes, `existingResourceId` for `DUPLICATE`, `currentRevision` for `CONFLICT`, and no metadata for the remaining codes.
+- Loaded the fixture through `JSON.parse` as `unknown`, validated every request, success, and failure with the existing boundary validators, and rejected an unapproved operation identifier.
+- Drove all ten named trusted entrypoints through explicitly named Resource Master method stubs, checked target-method exclusivity, and deep-compared parsed `JSON.stringify` outcomes for both success and failure.
+- Covered an opaque non-null cursor round trip and a separately validated final-page `null` cursor. The fixture contains no internal messages/stacks, provider, actor/capability, Convex, persistence, deployment, or catalog-administration data.
+- JSON remains repository test evidence only; no transport, protocol, schema/IDL, generation, SDK, distribution, or consumer decision was introduced.
+
+### Files, workload, and boundary
+
+- Added `apps/backend/tests/external-garfex-compatibility.test.ts` (244 lines) and `apps/backend/tests/fixtures/external-garfex-boundary/compatibility.json` (91 lines): 335 authored additions for the U9 slice, below the 400-line budget; no generated artifacts or deletions.
+- Updated the four U9 implementation-owned checkbox rows in `openspec/changes/external-garfex-boundary/tasks.md` to `[x]` immediately after their evidence completed.
+- Rollback is limited to the compatibility test, fixture, and U9 task/progress bookkeeping; no Resource Master, authentication, Convex, persistence, infrastructure, transport, or delivery file changed.
+- No U10 architecture work, U11 documentation work, commit, branch, push, PR, review, receipt, consumer, deployment, or release action was performed.
+
+### Verification
+
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/external-garfex-compatibility.test.ts` — exit 0; 1 file and 13 tests passed.
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/external-garfex-contract.test.ts tests/external-garfex-operations.test.ts tests/external-garfex-security.test.ts` — exit 0; 3 files and 96 tests passed.
+- `corepack pnpm --filter @garfex/backend test -- external-garfex-compatibility.test.ts` — exit 0; the package script ran 15 backend files and 211 tests rather than isolating the named file.
+- `corepack pnpm --filter @garfex/backend test` — exit 0; 15 backend files and 211 tests passed.
+- `corepack pnpm --filter @garfex/backend typecheck` — exit 0; no diagnostics.
+- `corepack pnpm exec biome format apps/backend/tests/external-garfex-compatibility.test.ts` — exit 0; no fixes required after refactor.
+- `corepack pnpm exec biome lint apps/backend/tests/external-garfex-compatibility.test.ts` — exit 0; no diagnostics.
+- `node -e "JSON.parse(require('fs').readFileSync('apps/backend/tests/fixtures/external-garfex-boundary/compatibility.json','utf8'))"` — exit 0; fixture JSON parsed.
+
+### Deviations
+
+- The fixture uses compact formatting for small reviewed evidence objects to keep the complete U9 candidate at 335 authored lines; it remains readable JSON and was not minified or used as a distributed artifact.
+- The package-filtered command accepts the named compatibility argument but runs the complete backend suite in this repository; the exact broader result is recorded rather than claimed as file isolation.
+- Full repository, architecture, build, `corepack pnpm check`, U10, U11, final validation, verify, sync, archive, and delivery gates remain intentionally unexecuted.
+
+### Structured status consumed and produced
+
+- Consumed native `gentle-ai.sdd-status`: `schemaName: gentle-ai.sdd-status`, change `external-garfex-boundary`, `artifactStore: openspec`, `applyState: ready`, `dependencies.apply: ready`, `dependencies.verify: blocked`, `dependencies.archive: blocked`, `nextRecommended: apply`, and no blocked reasons.
+- Consumed `actionContext.mode: repo-local`, workspace root `/home/garfex/PROGRAMACION/garfex-platform`, allowed edit root the same, and no warnings or edit-root violations.
+- Consumed the resolved `feature-branch-chain` workload path with `Decision needed before apply: No`, `Chained PRs recommended: Yes`, and no `size:exception` approval.
+- Continued active native attempt ordinal 18 for `U9-serialized-compatibility-parity` with the parent-provided token and 400-line bound; it was settled passed after the final evidence was recorded.
+- Native status after checkbox reconciliation reports 66 task rows, 53 complete, and 13 pending; `applyState` remains `ready` because U10, U11, final validation, and the parent lifecycle action remain unchecked.
+- This phase returns `parent-lifecycle`, not U10, verify, review, receipt, sync, archive, or delivery.
+
+### Current exact unchecked implementation and parent rows
+
+- [ ] Extend `tooling/tests/architecture.test.ts` with failing expectations for all seven rule names, a valid independent-contract fixture, a valid trusted-public-edge fixture, and these violations: `internal-import.ts`, `authority-field.ts`, `platform-leak.ts`, `trusted-internal-import.ts`, `generic-executor.ts`, `automatic-derivation.ts`, and `transport-import.ts`. <!-- sdd-owner: implementation -->
+- [ ] Update `tooling/architecture/check.mjs` with narrowly scoped import/syntax checks and add the valid/violating fixtures under `tooling/architecture-fixtures/valid/external-garfex-boundary/` and `tooling/architecture-fixtures/violations/external-garfex-boundary/`; keep trusted imports limited to public Resource Master/auth composition and reject Convex, persistence, deployment, transport, derivation, and generic business publication. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm test:architecture` and inspect the checker output for every named fixture, proving existing `external-client-boundary` protections remain green and the new rules do not rely on broad repository-wide keyword bans. <!-- sdd-owner: implementation -->
+- [ ] Refine rule diagnostics and fixture names in `tooling/architecture/check.mjs` and `tooling/tests/architecture.test.ts` so each violation fails for its intended rule only; rerun architecture tests and full typecheck. <!-- sdd-owner: implementation -->
+- [ ] Add the failing parser/assertions in `apps/backend/tests/external-garfex-documentation-parity.test.ts` for the exact ten operation rows, direct mappings, eleven error codes, allowlisted metadata names, and required non-decision statements before the canonical document is complete. <!-- sdd-owner: implementation -->
+- [ ] Create `docs/external-garfex-boundary.md` with the lead distinction `External Client Contract != Resource Master Public Application Contract`, exact operation/mapping/request/success/error tables, trusted identity flow, final module authorization, compatibility ownership, fixture/check commands, Convex isolation, and transport/IdP/schema/SDK/consumer non-decisions; update `docs/architecture.md`, `docs/external-client-boundary.md`, and `docs/auth-boundary.md` with links and dependency arrows only. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test -- external-garfex-documentation-parity.test.ts external-garfex-compatibility.test.ts` and `corepack pnpm test:architecture`, proving documented identifiers, direct mappings, metadata, and non-decisions agree without presenting JSON fixtures as a selected transport. <!-- sdd-owner: implementation -->
+- [ ] Apply progressive disclosure and review-oriented tables to `docs/external-garfex-boundary.md`, `docs/architecture.md`, `docs/external-client-boundary.md`, and `docs/auth-boundary.md`, remove duplicated contradictory semantics, preserve repository independence and deferred packaging, and rerun documentation parity plus the relevant focused tests. <!-- sdd-owner: implementation -->
+- [ ] Run the strict repository test command `corepack pnpm test` and record the exact Vitest result, including coverage completion. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test`, `corepack pnpm --filter @garfex/backend typecheck`, `corepack pnpm test:architecture`, and `corepack pnpm build`; record each exact result and any unexecuted check. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm check` and inspect `git diff --stat` plus `git diff --numstat` for the selected work unit/PR, confirming authored additions plus deletions stay within 400 lines per slice and no transport, SDK, productive IdP, Convex exposure, universal executor, or internal contract publication slipped in. <!-- sdd-owner: implementation -->
+- [ ] Verify rollback boundaries against `apps/backend/src/resource-master/`, `apps/backend/src/auth/`, `apps/backend/convex/`, and persistence/infrastructure files, confirming the change can be disabled without weakening Resource Master authorization or changing Convex persistence behavior. <!-- sdd-owner: implementation -->
+- [ ] After the final validation gate, confirm deviations and unexecuted checks are recorded for the SDD archive and close the lifecycle only if the forbidden-scope guardrails remain true. <!-- sdd-owner: parent -->
+
+### Historical U9 next recommendation
+
+At the U9 handoff, `parent-lifecycle` was required and U10 remained deferred.
+
+## U10 — Architecture fitness with controlled fixtures
+
+Status: completed; U11, final validation, verify, sync, archive, and parent-owned lifecycle work remain deferred.
+
+### TDD Cycle Evidence
+
+| Task | Test file | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Add U10 architecture assertions | `tooling/tests/architecture.test.ts` | Architecture integration | `corepack pnpm test:architecture`: 1 file, 4 tests passed before edits | Added the assertions first; focused run failed 2 new tests because the planned fixture targets did not exist, while 4 baseline tests passed | After checker and fixtures were added, 1 file and 6 tests passed | The matrix exercised seven different violating inputs plus the valid contract/public-edge directory | Final architecture test and package architecture command remained green after cleanup |
+| Implement the seven named rules | `tooling/architecture/check.mjs` | Narrow import/syntax checker | Existing checker baseline passed | Production checker rules were not written until the RED assertions existed | The seven focused files each failed with their intended named rule | Diagnostics were path-scoped and regex/syntax-specific; existing architecture rules remained unchanged |
+| Add controlled valid/violating fixtures | `tooling/architecture-fixtures/{valid,violations}/external-garfex-boundary/` | Controlled architecture fixtures | N/A (new fixtures) | Test targets intentionally failed with configuration errors before fixture creation | Two valid fixtures passed and seven violations failed | Direct checker inspection showed exactly one new U10 rule per focused violation | Fixture names and source shapes were kept readable and Biome-clean |
+| Run impacted validation | Architecture checker, root and backend typechecks | Repository architecture/type layer | 6/6 focused architecture tests passed | N/A after behavior was specified | `corepack pnpm test:architecture` passed with 62 modules cruised | Individual diagnostics covered all seven rule names; valid fixture passed with no U10 diagnostics | Root/backend typechecks, Biome format/lint, and final architecture reruns passed |
+
+### Implementation evidence
+
+- Added `external-contract-independent` for client-facing imports into backend, Resource Master, modules, auth, platform, or internal layer paths.
+- Added `external-contract-no-authority` for narrowly recognized authority property declarations and trusted authority type names in client-facing source.
+- Added `external-contract-no-platform` for client-facing and compatibility-fixture platform contract imports, type names, and exact platform field declarations.
+- Added `external-trusted-edge-public-only` for trusted-edge dependencies into Resource Master internals, non-composition auth, infrastructure, persistence, deployment, Convex, generated, domain, or application paths; public Resource Master and auth composition imports remain valid.
+- Added `external-no-generic-business-executor` for named generic callable exports, operation maps/registries, and iteration over `resourceMaster` methods.
+- Added `external-no-automatic-derivation` for `Pick`/`Omit`/`Parameters`/`ReturnType` and `keyof`/`typeof` derivation tied to Resource Master or platform names in client-facing source.
+- Added `external-no-transport` for selected HTTP/RPC/router/Convex imports and exact status/protocol framing declarations in boundary source.
+- Valid fixtures under `tooling/architecture-fixtures/valid/external-garfex-boundary/` prove an independent contract and a trusted edge importing only public Resource Master/auth composition. Violations are `internal-import.ts`, `authority-field.ts`, `platform-leak.ts`, `trusted-internal-import.ts`, `generic-executor.ts`, `automatic-derivation.ts`, and `transport-import.ts`; each reports only one of the seven new rule names.
+- Existing `external-client-boundary` protections remain green. The new checks are scoped by boundary paths and inspect imports or narrowly named syntax rather than banning broad repository keywords.
+
+### Files, workload, and rollback boundary
+
+- Changed `tooling/architecture/check.mjs` with 92 additions and 1 formatting-only deletion.
+- Changed `tooling/tests/architecture.test.ts` with 52 additions.
+- Added two valid fixtures and seven violating fixtures with 39 authored lines total.
+- Updated the four U10 implementation-owned task checkboxes to `[x]` after the U10 RED/GREEN/TRIANGULATE/REFACTOR evidence was complete and reconciled the persisted artifact.
+- U10 authored code/test/fixture workload is 184 additions plus deletions, below the 400-line feature-branch-chain slice budget; SDD bookkeeping is excluded from that authored count and no size exception was used.
+- Rollback is limited to the U10 checker additions, U10 architecture assertions, nine controlled fixtures, and U10 task/progress bookkeeping. No Resource Master, auth, Convex, persistence, infrastructure, transport, consumer, documentation, or U11 application behavior changed.
+- No commit, branch, push, PR, review, receipt, consumer, deployment, release, or U11 action was performed.
+
+### Verification
+
+- `corepack pnpm test:architecture` — exit 0; architecture test file passed 6 tests and the checker passed with 62 modules cruised.
+- `corepack pnpm exec vitest run tooling/tests/architecture.test.ts` — exit 0; 1 file and 6 tests passed after refactor.
+- Direct `node tooling/architecture/check.mjs` inspection — each of the seven focused violation files emitted only its intended U10 named rule; the valid boundary directory passed with `architecture check passed (6 modules cruised)`.
+- `corepack pnpm typecheck` — exit 0; root tooling TypeScript check produced no diagnostics.
+- `corepack pnpm --filter @garfex/backend typecheck` — exit 0; backend TypeScript check produced no diagnostics.
+- `corepack pnpm exec biome format tooling/architecture/check.mjs tooling/tests/architecture.test.ts tooling/architecture-fixtures/valid/external-garfex-boundary tooling/architecture-fixtures/violations/external-garfex-boundary` — exit 0; 11 JS/TS files checked without writes.
+- `corepack pnpm exec biome lint tooling/architecture/check.mjs tooling/tests/architecture.test.ts tooling/architecture-fixtures/valid/external-garfex-boundary tooling/architecture-fixtures/violations/external-garfex-boundary` — exit 0; 11 JS/TS files checked without diagnostics.
+- `node --check tooling/architecture/check.mjs` — exit 0.
+
+### Deviations
+
+- Biome identified a pre-existing unnecessary escape in `operationalValues`; the equivalent `[:-]` spelling was applied while touching the checker so the requested JS/TS lint gate is clean.
+- The checker follows the repository's existing dependency-cruiser plus regex/syntax style rather than introducing a parser or schema dependency. Rule vocabulary is limited to the named boundary concepts and does not perform repository-wide keyword bans.
+- The package configuration still reports the native next route as `apply` because U11 and final implementation rows remain unchecked; this phase's executor handoff is `parent-lifecycle` and must not start U11.
+
+### Structured status consumed and produced
+
+- Consumed native `gentle-ai.sdd-status` before editing: `schemaName: gentle-ai.sdd-status`, change `external-garfex-boundary`, `artifactStore: openspec`, `applyState: ready`, `dependencies.apply: ready`, `dependencies.verify: blocked`, `dependencies.archive: blocked`, `nextRecommended: apply`, and task progress 53 complete/13 pending.
+- Consumed `actionContext.mode: repo-local`, workspace root `/home/garfex/PROGRAMACION/garfex-platform`, allowed edit root `/home/garfex/PROGRAMACION/garfex-platform`, and no warnings; every changed path stayed inside the allowed root.
+- Consumed the resolved workload path `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: feature-branch-chain`, and no `size:exception` approval.
+- Acquired the active bounded U10 attempt with the parent-provided token before runtime checks and settled it `complete`/`passed` after verification with evidence revision `sha256:3a5abd331c6ba0248781630de2770763282fa0cb6b008c1ac57f7bb7a44116a6`.
+- Native status after task reconciliation reports 57 complete/9 pending, `applyState: ready`, `verify: blocked`, `archive: blocked`, and `nextRecommended: apply`; no review, receipt, or delivery gate was started.
+
+### Current exact unchecked implementation and parent-owned rows
+
+- [ ] Add the failing parser/assertions in `apps/backend/tests/external-garfex-documentation-parity.test.ts` for the exact ten operation rows, direct mappings, eleven error codes, allowlisted metadata names, and required non-decision statements before the canonical document is complete. <!-- sdd-owner: implementation -->
+- [ ] Create `docs/external-garfex-boundary.md` with the lead distinction `External Client Contract != Resource Master Public Application Contract`, exact operation/mapping/request/success/error tables, trusted identity flow, final module authorization, compatibility ownership, fixture/check commands, Convex isolation, and transport/IdP/schema/SDK/consumer non-decisions; update `docs/architecture.md`, `docs/external-client-boundary.md`, and `docs/auth-boundary.md` with links and dependency arrows only. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test -- external-garfex-documentation-parity.test.ts external-garfex-compatibility.test.ts` and `corepack pnpm test:architecture`, proving documented identifiers, direct mappings, metadata, and non-decisions agree without presenting JSON fixtures as a selected transport. <!-- sdd-owner: implementation -->
+- [ ] Apply progressive disclosure and review-oriented tables to `docs/external-garfex-boundary.md`, `docs/architecture.md`, `docs/external-client-boundary.md`, and `docs/auth-boundary.md`, remove duplicated contradictory semantics, preserve repository independence and deferred packaging, and rerun documentation parity plus the relevant focused tests. <!-- sdd-owner: implementation -->
+- [ ] Run the strict repository test command `corepack pnpm test` and record the exact Vitest result, including coverage completion. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test`, `corepack pnpm --filter @garfex/backend typecheck`, `corepack pnpm test:architecture`, and `corepack pnpm build`; record each exact result and any unexecuted check. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm check` and inspect `git diff --stat` plus `git diff --numstat` for the selected work unit/PR, confirming authored additions plus deletions stay within 400 lines per slice and no transport, SDK, productive IdP, Convex exposure, universal executor, or internal contract publication slipped in. <!-- sdd-owner: implementation -->
+- [ ] Verify rollback boundaries against `apps/backend/src/resource-master/`, `apps/backend/src/auth/`, `apps/backend/convex/`, and persistence/infrastructure files, confirming the change can be disabled without weakening Resource Master authorization or changing Convex persistence behavior. <!-- sdd-owner: implementation -->
+- [ ] After the final validation gate, confirm deviations and unexecuted checks are recorded for the SDD archive and close the lifecycle only if the forbidden-scope guardrails remain true. <!-- sdd-owner: parent -->
+
+### Next recommendation
+
+Hand off to `parent-lifecycle`; do not start U11 in this apply phase.
+
+## U11 — Canonical boundary documentation and executable parity
+
+Status: completed; final repository validation and parent lifecycle remain deferred.
+
+### TDD Cycle Evidence
+
+| Stage | Evidence | Result |
+| --- | --- | --- |
+| RED | Wrote `apps/backend/tests/external-garfex-documentation-parity.test.ts` before the canonical document and ran `corepack pnpm --filter @garfex/backend exec vitest run tests/external-garfex-documentation-parity.test.ts`. | Failed as intended: 2 tests failed because `docs/external-garfex-boundary.md` did not exist. |
+| GREEN | Added the canonical document, operation/error parity tables, and non-decision markers. | Initial parser feedback identified prose qualifiers after machine metadata identifiers; the parser was narrowed to the first marker token, then the focused suite passed 2/2. |
+| TRIANGULATE | Ran the focused parity/compatibility suites, the required package command, architecture checks, backend typecheck, Biome checks, and markdown structure/link checks. | Focused run passed 2 files and 15 tests; package command passed all 16 backend files and 213 tests; architecture passed 6 tests and `architecture check passed (62 modules cruised)`; typecheck and all other checks passed. |
+| REFACTOR | Applied Biome formatting to the parity test, corrected linked-document indentation/trailing whitespace, and reran the impacted checks. | Final parity, compatibility, architecture, typecheck, Biome, markdown, and whitespace checks passed without semantic changes. |
+
+### Implementation evidence
+
+- Created `docs/external-garfex-boundary.md` as the canonical record, leading with the exact distinction `External Client Contract != Resource Master Public Application Contract`.
+- Documented the exact ten direct operation mappings and capabilities, reviewed request/success summaries, trusted identity flow, fresh server actor construction, and Resource Master final deny-by-default authorization.
+- Documented the exact eleven external failure codes and allowlisted metadata, with machine-readable parity markers compared to executable constants and the compatibility fixture.
+- Recorded GARFEX compatibility ownership, fixture/check paths, Convex encapsulation, absence of a generic business API, opaque pagination, no network reachability, and all requested non-decisions.
+- Updated `docs/architecture.md`, `docs/external-client-boundary.md`, and `docs/auth-boundary.md` with canonical links and dependency arrows while preserving independent repositories, provider-neutral auth, and private Convex infrastructure.
+- Added `apps/backend/tests/external-garfex-documentation-parity.test.ts`; it parses marked machine-readable tables rather than asserting fragile explanatory prose, compares operations/mappings/errors/metadata to executable values and fixtures, and checks the non-decision marker set.
+
+### Files, workload, and rollback boundary
+
+- Changed `docs/external-garfex-boundary.md`, `docs/architecture.md`, `docs/external-client-boundary.md`, `docs/auth-boundary.md`, and `apps/backend/tests/external-garfex-documentation-parity.test.ts`.
+- Updated the four U11 implementation-owned task rows in `openspec/changes/external-garfex-boundary/tasks.md` to `[x]` immediately after final evidence; the persisted task artifact was reread and reconciled.
+- U11 is the assigned feature-branch-chain slice. Authored additions plus deletions are estimated at 364 lines: 191 new canonical-document lines, 126 new parity-test lines, and 47 linked-document diff lines, below the 400-line budget; no split or size exception was needed.
+- Rollback removes only the canonical document, three linked-document edits, parity test, and U11 task/progress bookkeeping; executable boundary code, compatibility fixture, architecture rules, Resource Master, auth composition, Convex, and persistence remain unchanged.
+- No final gate, commit, branch, push, PR, review, receipt, consumer, deployment, transport, SDK, productive IdP, or network exposure was created.
+
+### Verification
+
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/external-garfex-documentation-parity.test.ts` — RED failed with 2 missing-document tests; final focused parity run passed 2 tests.
+- `corepack pnpm --filter @garfex/backend exec vitest run tests/external-garfex-documentation-parity.test.ts tests/external-garfex-compatibility.test.ts` — exit 0; 2 files and 15 tests passed.
+- `corepack pnpm --filter @garfex/backend test -- external-garfex-documentation-parity.test.ts external-garfex-compatibility.test.ts` — exit 0; the backend package command ran 16 files and 213 tests.
+- `corepack pnpm test:architecture` — exit 0; 6 architecture tests passed and the checker cruised 62 modules.
+- `corepack pnpm --filter @garfex/backend typecheck` — exit 0; no diagnostics.
+- `corepack pnpm exec biome format docs/external-garfex-boundary.md docs/architecture.md docs/external-client-boundary.md docs/auth-boundary.md apps/backend/tests/external-garfex-documentation-parity.test.ts` — exit 0; no changes required after refactor.
+- `corepack pnpm exec biome lint docs/external-garfex-boundary.md docs/architecture.md docs/external-client-boundary.md docs/auth-boundary.md apps/backend/tests/external-garfex-documentation-parity.test.ts` — exit 0; no diagnostics.
+- Markdown structural check via `node --input-type=module` — exit 0; four documents had balanced fences and readable relative links.
+- `git diff --check` plus trailing-whitespace inspection of new files — exit 0; no whitespace errors.
+
+### Deviations and unexecuted checks
+
+- The parity parser intentionally compares the machine identifier token at the start of an error metadata cell, so human-readable qualifiers such as disclosure conditions cannot create prose-coupled failures.
+- No repository markdownlint package or configuration is present; Biome formatting plus the explicit fence/link structural check supplied the markdown check without adding a tool or technology decision.
+- The package-filtered test command accepts the named files but runs the complete backend suite; the truthful 16-file/213-test result is recorded.
+- The strict repository test, build, `corepack pnpm check`, final rollback gate, verify, review, receipt, sync, archive, and parent lifecycle remain intentionally unexecuted.
+
+### Structured status consumed and produced
+
+- Consumed the authoritative parent status for `external-garfex-boundary`: OpenSpec repo-local authority, U1–U10 complete, U11 ready, `actionContext.mode: repo-local`, workspace and allowed edit root `/home/garfex/PROGRAMACION/garfex-platform`, and no warnings.
+- Consumed the resolved workload path `Decision needed before apply: No`, `Chained PRs recommended: Yes`, `Chain strategy: feature-branch-chain`, and no `size:exception` approval.
+- Produced the four U11 task checkbox updates and this cumulative OpenSpec progress section; no prior progress was overwritten.
+- Native apply remains incomplete only because final validation and the parent-owned archive/lifecycle row are unchecked; the next recommendation is `parent-lifecycle`, not final gate, verify, review, receipt, or archive.
+
+### Current exact unchecked implementation and parent-owned rows
+
+- [ ] Run the strict repository test command `corepack pnpm test` and record the exact Vitest result, including coverage completion. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm --filter @garfex/backend test`, `corepack pnpm --filter @garfex/backend typecheck`, `corepack pnpm test:architecture`, and `corepack pnpm build`; record each exact result and any unexecuted check. <!-- sdd-owner: implementation -->
+- [ ] Run `corepack pnpm check` and inspect `git diff --stat` plus `git diff --numstat` for the selected work unit/PR, confirming authored additions plus deletions stay within 400 lines per slice and no transport, SDK, productive IdP, Convex exposure, universal executor, or internal contract publication slipped in. <!-- sdd-owner: implementation -->
+- [ ] Verify rollback boundaries against `apps/backend/src/resource-master/`, `apps/backend/src/auth/`, `apps/backend/convex/`, and persistence/infrastructure files, confirming the change can be disabled without weakening Resource Master authorization or changing Convex persistence behavior. <!-- sdd-owner: implementation -->
+- [ ] After the final validation gate, confirm deviations and unexecuted checks are recorded for the SDD archive and close the lifecycle only if the forbidden-scope guardrails remain true. <!-- sdd-owner: parent -->
+
+## Final-validation remediation — formatting and authoritative U8 workload evidence
+
+Status: implementation remediation completed; native settlement remains with the parent.
+
+### Strict-TDD remediation evidence
+
+| Stage | Evidence | Result |
+| --- | --- | --- |
+| RED | The failed final-validation evidence revision `sha256:8ef9cb570ef4dedca756f84ab325d838bb914d8a3c3ec96d038673e19b1eac3e` identified two Biome formatting failures and missing U8 authored-line evidence. | Failure was reproduced by the pre-write Biome check on exactly the two authorized files. |
+| GREEN | `corepack pnpm exec biome format --write apps/backend/src/external-garfex-boundary/client-facing/contract.ts apps/backend/tests/fixtures/external-garfex-boundary/compatibility.json` | Biome formatted exactly two files; no semantic source or fixture values were changed. |
+| TRIANGULATE | Complete repository gate and independent workload reconstruction below. | All required tests, typechecks, architecture, build, format/lint, whitespace, candidate-snapshot, forbidden-scope, and rollback inspections passed. |
+| REFACTOR | Re-ran the two-file non-writing Biome check after the write. | Exit 0; both files were checked with no fixes required. |
+
+### Verified U8 authored-line reconstruction
+
+The supplied premises were checked before recording this evidence. Current line counts were verified with `wc -l`: `mutation-operations.ts` is 198 lines, `read-operations.ts` is 293, `external-garfex-operations.test.ts` is 758, `external-garfex-security.test.ts` is 371, `identity.ts` is 24, and `errors.ts` is 155.
+
+- Accepted U6a operation-test baseline: 441 lines, as recorded in the accepted U6a section.
+- U6b added 85 operation-test lines, as recorded in the accepted U6b workload.
+- U7 total was 170 lines. Read operations grew from 257 after U6b (`199` U6a production lines plus `58` U6b production lines) to 293 after U7, so U7 production was `293 - 257 = 36` lines and U7 operation-test addition was `170 - 36 = 134` lines.
+- The accepted operation-test baseline before U8 was therefore `441 + 85 + 134 = 660` lines.
+- The current post-U8 operation test is 758 lines, so the U8 operation-test addition is `758 - 660 = 98` lines. U9–U11 file lists do not include this test; the separately recorded U8 export-name correction touched 9 authored lines and is excluded from the original U8 total.
+- The U3 security-test baseline was 90 lines (`114` U3 total lines minus the `24`-line identity source). U4 added approximately 338 total lines, including the 155-line errors source, so the security baseline before U8 was `90 + (338 - 155) = 273` lines.
+- The current security test is 371 lines, so the U8 security-test addition is `371 - 273 = 98` lines. U9–U11 did not edit this test; the 9-line export-name correction remains separately accounted for.
+- U8 production is the newly authored 198-line `mutation-operations.ts`. Therefore U8 total is `198 + 98 + 98 = 394` authored lines, under the 400-line work-unit budget.
+- The later export-name correction is separately recorded as 9 changed lines under its own 80-line correction budget. No premise was false and no workload evidence was inferred without a checked source or line count.
+
+### Remediation files, boundary, and status
+
+- Formatting-only changes are limited to `apps/backend/src/external-garfex-boundary/client-facing/contract.ts` and `apps/backend/tests/fixtures/external-garfex-boundary/compatibility.json`; no semantic values changed and the fixture still parses as 10 operations, 11 error entries, and 2 cursor examples.
+- The four final-validation implementation rows are completed in `tasks.md`; the deferred parent-owned archive/lifecycle row remains unchecked and byte-for-byte unchanged.
+- Workload boundary remains `feature-branch-chain`, with no `size:exception`. The native objective is `final-validation-remediation`, bound to failed evidence revision `sha256:8ef9cb570ef4dedca756f84ab325d838bb914d8a3c3ec96d038673e19b1eac3e`, with a 100-line remediation maximum. No review, receipt, commit, branch, push, PR, transport, consumer, deployment, sync, verify, or archive action was started.
+
+### Complete final-validation evidence
+
+- `corepack pnpm test` — exit 0; Vitest 4.1.11 ran 17 files and 219 tests. Coverage completed: statements 92.64% (1499/1618), branches 85.95% (918/1068), functions 99.43% (355/357), lines 94.24% (1327/1408).
+- `corepack pnpm --filter @garfex/backend test` — exit 0; 16 files and 213 tests passed.
+- `corepack pnpm --filter @garfex/backend typecheck` — exit 0; backend `tsc --noEmit` produced no diagnostics.
+- `corepack pnpm test:architecture` — exit 0; 6 architecture tests passed and `architecture check passed (62 modules cruised)`.
+- `corepack pnpm build` — exit 0; `tsc -b` passed.
+- `corepack pnpm check` — exit 0; Biome format checked 143 files with no fixes, Biome lint checked 143 files with no diagnostics, root typecheck passed, the 17-file/219-test coverage run passed with the summary above, architecture passed 6 tests with 62 modules cruised, and `tsc -b` passed.
+- The post-write two-file Biome check — exit 0; both authorized files checked with no fixes. Formatting and lint therefore reached completion in the complete check.
+- `git diff --check` — exit 0. Whole-candidate trailing-whitespace scan — 0 errors.
+- Whole-candidate inspection reported 34 paths: 5 tracked modified files with `180` insertions and `12` deletions, plus 29 untracked files with line-count numstat `7575` additions and `0` deletions. No generated artifact was introduced.
+- Forbidden-scope and rollback inspection reported 0 paths under `apps/backend/src/resource-master/`, `apps/backend/src/auth/`, `apps/backend/convex/`, persistence, or infrastructure; rollback targets are untouched.
+
+### Structured status consumed and produced
+
+- Consumed native `gentle-ai.sdd-status` for `external-garfex-boundary`: OpenSpec authority, repo-local workspace `/home/garfex/PROGRAMACION/garfex-platform`, allowed edit root the same, `applyState: ready`, `dependencies.apply: ready`, `dependencies.verify: blocked`, `dependencies.archive: blocked`, `nextRecommended: apply`, and no blocked reasons before the remediation edits.
+- Consumed valid ownership markers on all 66 task rows: 0 malformed markers, 4 unchecked implementation rows, and 1 unchecked parent row before reconciliation. The workload gate was already resolved to `feature-branch-chain`; no decision or size exception was needed.
+- Authenticated the parent-held native attempt with token `sha256:3cbcd57bc901064e8b00eb12ff3990c05d1c6a89f4b3abaa733f55d52320d9c7`; native acquire returned `proceed` for ordinal 22 and the exact remediation binding. Settlement is intentionally left to the parent; any passing settlement must name `--remediates-evidence-revision sha256:8ef9cb570ef4dedca756f84ab325d838bb914d8a3c3ec96d038673e19b1eac3e` and use a distinct evidence revision.
+- Action-context warnings: none. All edits remained inside the authoritative workspace and allowed edit root. `skill_resolution: paths-injected`; the three requested skill files were loaded before work. CodeGraph MCP was unavailable, so the present CodeGraph CLI index was used after the required root/index check; no broad structural fallback was needed.
+
+### Remaining lifecycle action
+
+- The only remaining unchecked task is the exact parent-owned row: `- [ ] After the final validation gate, confirm deviations and unexecuted checks are recorded for the SDD archive and close the lifecycle only if the forbidden-scope guardrails remain true. <!-- sdd-owner: parent -->`
+- Next recommendation: `parent-lifecycle`. This executor does not start SDD verify/sync/archive, review, receipt, commit, branch, push, PR, transport, consumer, or deployment actions.
