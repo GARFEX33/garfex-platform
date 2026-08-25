@@ -13,6 +13,32 @@ const check = (fixture: "valid" | "violations") =>
     encoding: "utf8",
   });
 
+const checkTarget = (target: string) =>
+  spawnSync(process.execPath, [checker, target], {
+    cwd: root,
+    encoding: "utf8",
+  });
+
+const externalBoundaryRules = [
+  "external-contract-independent",
+  "external-contract-no-authority",
+  "external-contract-no-platform",
+  "external-trusted-edge-public-only",
+  "external-no-generic-business-executor",
+  "external-no-automatic-derivation",
+  "external-no-transport",
+] as const;
+
+const focusedExternalBoundaryFixtures = [
+  ["internal-import.ts", "external-contract-independent", "client-facing"],
+  ["authority-field.ts", "external-contract-no-authority", "client-facing"],
+  ["platform-leak.ts", "external-contract-no-platform", "client-facing"],
+  ["trusted-internal-import.ts", "external-trusted-edge-public-only", "trusted"],
+  ["generic-executor.ts", "external-no-generic-business-executor", "trusted"],
+  ["automatic-derivation.ts", "external-no-automatic-derivation", "client-facing"],
+  ["transport-import.ts", "external-no-transport", "trusted"],
+] as const;
+
 const outputOf = (result: ReturnType<typeof spawnSync>) =>
   `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 
@@ -74,6 +100,32 @@ describe("architecture fitness functions", () => {
     expect(output).toContain("external-client-boundary/pnpm-lock.yaml");
     expect(output).toContain("external-client-boundary/package-lock.json");
     expect(output).toContain("external-client-boundary/yarn.lock");
+  });
+
+  it("accepts independent contract and trusted public-edge fixtures", () => {
+    const result = checkTarget("tooling/architecture-fixtures/valid/external-garfex-boundary");
+    const output = outputOf(result);
+
+    expect(result.status, output).toBe(0);
+    expect(output).toContain("architecture check passed");
+    for (const rule of externalBoundaryRules) {
+      expect(output).not.toContain(`error ${rule}:`);
+    }
+  });
+
+  it("reports each focused external-boundary violation by its named rule", () => {
+    for (const [file, expectedRule, layer] of focusedExternalBoundaryFixtures) {
+      const result = checkTarget(
+        `tooling/architecture-fixtures/violations/external-garfex-boundary/${layer}/${file}`,
+      );
+      const output = outputOf(result);
+      const reportedRules = externalBoundaryRules.filter((rule) =>
+        output.includes(`error ${rule}:`),
+      );
+
+      expect(result.status, `${file}: ${output}`).toBe(1);
+      expect(reportedRules, `${file}: ${output}`).toEqual([expectedRule]);
+    }
   });
 
   it("rejects an escaping counterpart symlink without traversing it", () => {
