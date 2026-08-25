@@ -597,4 +597,218 @@ describe("external GARFEX client-facing contract", () => {
       }
     });
   });
+
+  describe("external GARFEX discovery output validation", () => {
+    it("rebuilds discovery success shapes with fresh nested values", () => {
+      for (const operation of discoveryOperations) {
+        const input = successValues[operation];
+        const result = successValidators[operation](input);
+        expect(result).toEqual(input);
+        expectFresh(input, result);
+      }
+    });
+
+    it("rejects extra or malformed discovery fields as contained failures", () => {
+      for (const [operation, value] of extraSuccessCases) {
+        expectInternalFailure(successValidators[operation](value));
+      }
+
+      const malformedSuccessCases: SuccessExtraCase[] = [
+        ["getTaxonomy", [{ code: "hardware", name: "Hardware", families: "invalid" }]],
+        [
+          "getEffectiveResourceSchema",
+          { attributes: [{ ...successSchema.attributes[0], kind: "UNREVIEWED" }] },
+        ],
+        ["getValidOptions", [{ code: "bare", label: 4 }]],
+        ["getNaturalUnits", { allowed: [], suggested: null }],
+      ];
+      for (const [operation, value] of malformedSuccessCases) {
+        expectInternalFailure(successValidators[operation](value));
+      }
+    });
+
+    it("contains hostile discovery values without diagnostics", () => {
+      const extraArray = Object.assign([], { internalField: "secret" });
+      expectInternalFailure(validateExternalGetValidOptionsSuccess(extraArray));
+      expectInternalFailure(
+        validateExternalGetEffectiveResourceSchemaSuccess({
+          get attributes() {
+            throw new Error("internal schema secret");
+          },
+        }),
+      );
+      expectInternalFailure(
+        validateExternalGetTaxonomySuccess(
+          Object.assign([...successTaxonomy], { internalField: "secret" }),
+        ),
+      );
+      expectInternalFailure(
+        validateExternalGetNaturalUnitsSuccess({
+          ...successNaturalUnits,
+          suggested: { ...successNaturalUnits.suggested, internalField: "secret" },
+        }),
+      );
+    });
+
+    it("accepts null-prototype discovery objects and rebuilds them", () => {
+      const entry = Object.create(null) as Record<string, unknown>;
+      entry.code = "hardware";
+      entry.name = "Hardware";
+      entry.families = [];
+      const result = validateExternalGetTaxonomySuccess([entry]);
+      expect(result).toEqual([{ code: "hardware", name: "Hardware", families: [] }]);
+      if (!Array.isArray(result)) return;
+      expect(result[0]).not.toBe(entry);
+    });
+  });
+
+  describe("external GARFEX resource/search/mutation output validation", () => {
+    it("rebuilds every remaining success shape with fresh nested values", () => {
+      for (const operation of resourceSuccessOperations) {
+        const result = resourceSuccessValidators[operation](successResource);
+        expect(result).toEqual(successResource);
+        expectFresh(successResource, result);
+      }
+
+      const searchResult = validateExternalSearchResourcesSuccess(successSearch);
+      expect(searchResult).toEqual(successSearch);
+      expectFresh(successSearch, searchResult);
+
+      const descriptionResult = validateExternalDescribeResourceSuccess(successDescription);
+      expect(descriptionResult).toEqual(successDescription);
+      expectFresh(successDescription, descriptionResult);
+    });
+
+    it("preserves opaque cursors and nullable final-page cursors", () => {
+      const continued = validateExternalSearchResourcesSuccess(successSearch);
+      expect(continued).toMatchObject({ cursor: "opaque|cursor-v2|private-state" });
+      expect(JSON.parse(JSON.stringify(continued))).toEqual(successSearch);
+
+      const finalPage = { ...successSearch, cursor: null };
+      expect(validateExternalSearchResourcesSuccess(finalPage)).toEqual(finalPage);
+    });
+
+    it("rejects extra and malformed resource, search, and description fields", () => {
+      const resourceWithAuthority = { ...successResource, actorId: "forged" };
+      for (const operation of resourceSuccessOperations) {
+        expectInternalFailure(resourceSuccessValidators[operation](resourceWithAuthority));
+      }
+
+      const resourceWithNestedPlatformField = {
+        ...successResource,
+        attributes: successResource.attributes.map((attribute) =>
+          attribute.attributeCode === "finish"
+            ? { ...attribute, platformSecret: "hidden" }
+            : attribute,
+        ),
+      };
+      expectInternalFailure(validateExternalGetResourceSuccess(resourceWithNestedPlatformField));
+
+      const resourceWithQuantityExtra = {
+        ...successResource,
+        attributes: successResource.attributes.map((attribute) =>
+          attribute.attributeCode === "gauge"
+            ? { ...attribute, value: { magnitude: "12", unitCode: "awg", internalUnit: "hidden" } }
+            : attribute,
+        ),
+      };
+      expectInternalFailure(validateExternalCreateResourceSuccess(resourceWithQuantityExtra));
+
+      expectInternalFailure(
+        validateExternalSearchResourcesSuccess({
+          ...successSearch,
+          items: successSearch.items.map((item) => ({ ...item, repositoryId: "hidden" })),
+        }),
+      );
+      expectInternalFailure(
+        validateExternalSearchResourcesSuccess({ ...successSearch, cursor: 12 }),
+      );
+      expectInternalFailure(validateExternalSearchResourcesSuccess({ items: successSearch.items }));
+      expectInternalFailure(
+        validateExternalDescribeResourceSuccess({ ...successDescription, internalField: true }),
+      );
+    });
+
+    it("contains malformed output and hostile serialization values", () => {
+      expectInternalFailure(
+        validateExternalGetResourceSuccess({ ...successResource, revision: -1 }),
+      );
+      expectInternalFailure(
+        validateExternalUpdateNonIdentityDataSuccess({
+          ...successResource,
+          identityPolicyVersion: "v2",
+        }),
+      );
+      expectInternalFailure(
+        validateExternalSearchResourcesSuccess({
+          ...successSearch,
+          items: successSearch.items.map((item) => ({ ...item, optionCodes: [12] })),
+        }),
+      );
+      expectInternalFailure(validateExternalDescribeResourceSuccess({ resourceId: "resource-1" }));
+
+      const hostileResource = {
+        ...successResource,
+        get attributes(): never {
+          throw new Error("internal resource secret");
+        },
+      };
+      const result = validateExternalDeactivateResourceSuccess(hostileResource);
+      expectInternalFailure(result);
+      expect(JSON.stringify(result)).not.toContain("internal resource secret");
+    });
+  });
+
+  describe("external GARFEX failure validation", () => {
+    it("rebuilds all eleven failures with only code-allowlisted metadata", () => {
+      const expectedKeys: Record<ExternalError["code"], readonly string[]> = {
+        UNAUTHENTICATED: ["code"],
+        FORBIDDEN: ["code"],
+        INVALID_ARGUMENT: ["code", "fieldIssues"],
+        INVALID_REFERENCE: ["code", "fieldIssues"],
+        VALIDATION_FAILED: ["code", "fieldIssues"],
+        NOT_FOUND: ["code"],
+        DUPLICATE: ["code", "existingResourceId"],
+        CONFLICT: ["code", "currentRevision"],
+        INVALID_LIFECYCLE: ["code"],
+        CATALOG_UNAVAILABLE: ["code"],
+        INTERNAL_FAILURE: ["code"],
+      };
+
+      expect(safeFailures).toHaveLength(11);
+      for (const failure of safeFailures) {
+        const result = validateExternalFailure(failure);
+        expect(result).toEqual(failure);
+        expectFresh(failure, result);
+        expect(Object.keys(result.error)).toEqual(expectedKeys[failure.error.code]);
+      }
+    });
+
+    it("rebuilds omitted metadata from null-prototype failures", () => {
+      const codes = [
+        "UNAUTHENTICATED",
+        "FORBIDDEN",
+        "INVALID_ARGUMENT",
+        "INVALID_REFERENCE",
+        "VALIDATION_FAILED",
+        "NOT_FOUND",
+        "DUPLICATE",
+        "CONFLICT",
+        "INVALID_LIFECYCLE",
+        "CATALOG_UNAVAILABLE",
+        "INTERNAL_FAILURE",
+      ] as const;
+
+      for (const code of codes) {
+        const error = Object.create(null) as Record<string, unknown>;
+        error.code = code;
+        const failure = Object.create(null) as Record<string, unknown>;
+        failure.ok = false;
+        failure.error = error;
+        const result = validateExternalFailure(failure);
+        expect(result).toEqual({ ok: false, error: { code } });
+        expect(result.error).not.toBe(error);
+      }
+    });
+  });
 });
