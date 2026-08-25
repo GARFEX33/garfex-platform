@@ -1142,3 +1142,27 @@ The supplied premises were checked before recording this evidence. Current line 
 - The four final-validation implementation rows are completed in `tasks.md`; the deferred parent-owned archive/lifecycle row remains unchecked and byte-for-byte unchanged.
 - Workload boundary remains `feature-branch-chain`, with no `size:exception`. The native objective is `final-validation-remediation`, bound to failed evidence revision `sha256:8ef9cb570ef4dedca756f84ab325d838bb914d8a3c3ec96d038673e19b1eac3e`, with a 100-line remediation maximum. No review, receipt, commit, branch, push, PR, transport, consumer, deployment, sync, verify, or archive action was started.
 
+### Complete final-validation evidence
+
+- `corepack pnpm test` — exit 0; Vitest 4.1.11 ran 17 files and 219 tests. Coverage completed: statements 92.64% (1499/1618), branches 85.95% (918/1068), functions 99.43% (355/357), lines 94.24% (1327/1408).
+- `corepack pnpm --filter @garfex/backend test` — exit 0; 16 files and 213 tests passed.
+- `corepack pnpm --filter @garfex/backend typecheck` — exit 0; backend `tsc --noEmit` produced no diagnostics.
+- `corepack pnpm test:architecture` — exit 0; 6 architecture tests passed and `architecture check passed (62 modules cruised)`.
+- `corepack pnpm build` — exit 0; `tsc -b` passed.
+- `corepack pnpm check` — exit 0; Biome format checked 143 files with no fixes, Biome lint checked 143 files with no diagnostics, root typecheck passed, the 17-file/219-test coverage run passed with the summary above, architecture passed 6 tests with 62 modules cruised, and `tsc -b` passed.
+- The post-write two-file Biome check — exit 0; both authorized files checked with no fixes. Formatting and lint therefore reached completion in the complete check.
+- `git diff --check` — exit 0. Whole-candidate trailing-whitespace scan — 0 errors.
+- Whole-candidate inspection reported 34 paths: 5 tracked modified files with `180` insertions and `12` deletions, plus 29 untracked files with line-count numstat `7575` additions and `0` deletions. No generated artifact was introduced.
+- Forbidden-scope and rollback inspection reported 0 paths under `apps/backend/src/resource-master/`, `apps/backend/src/auth/`, `apps/backend/convex/`, persistence, or infrastructure; rollback targets are untouched.
+
+### Structured status consumed and produced
+
+- Consumed native `gentle-ai.sdd-status` for `external-garfex-boundary`: OpenSpec authority, repo-local workspace `/home/garfex/PROGRAMACION/garfex-platform`, allowed edit root the same, `applyState: ready`, `dependencies.apply: ready`, `dependencies.verify: blocked`, `dependencies.archive: blocked`, `nextRecommended: apply`, and no blocked reasons before the remediation edits.
+- Consumed valid ownership markers on all 66 task rows: 0 malformed markers, 4 unchecked implementation rows, and 1 unchecked parent row before reconciliation. The workload gate was already resolved to `feature-branch-chain`; no decision or size exception was needed.
+- Authenticated the parent-held native attempt with token `sha256:3cbcd57bc901064e8b00eb12ff3990c05d1c6a89f4b3abaa733f55d52320d9c7`; native acquire returned `proceed` for ordinal 22 and the exact remediation binding. Settlement is intentionally left to the parent; any passing settlement must name `--remediates-evidence-revision sha256:8ef9cb570ef4dedca756f84ab325d838bb914d8a3c3ec96d038673e19b1eac3e` and use a distinct evidence revision.
+- Action-context warnings: none. All edits remained inside the authoritative workspace and allowed edit root. `skill_resolution: paths-injected`; the three requested skill files were loaded before work. CodeGraph MCP was unavailable, so the present CodeGraph CLI index was used after the required root/index check; no broad structural fallback was needed.
+
+### Remaining lifecycle action
+
+- The only remaining unchecked task is the exact parent-owned row: `- [ ] After the final validation gate, confirm deviations and unexecuted checks are recorded for the SDD archive and close the lifecycle only if the forbidden-scope guardrails remain true. <!-- sdd-owner: parent -->`
+- Next recommendation: `parent-lifecycle`. This executor does not start SDD verify/sync/archive, review, receipt, commit, branch, push, PR, transport, consumer, or deployment actions.
