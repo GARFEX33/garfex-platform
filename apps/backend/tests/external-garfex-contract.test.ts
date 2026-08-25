@@ -378,4 +378,223 @@ describe("external GARFEX client-facing contract", () => {
     expect(externalOperationIdentifiers).toEqual(expectedOperations);
     expect(new Set(externalOperationIdentifiers).size).toBe(10);
   });
+
+  it("contains exactly the eleven safe external error codes", () => {
+    expect(externalErrorCodes).toEqual(expectedErrors);
+    expect(new Set(externalErrorCodes).size).toBe(11);
+  });
+
+  it("keeps error metadata discriminated and excludes arbitrary messages", () => {
+    expect(Object.keys(safeFailures[1]?.error ?? {})).toEqual(["code"]);
+    expect(Object.keys(safeFailures[6]?.error ?? {})).toEqual(["code", "existingResourceId"]);
+    expect(Object.keys(safeFailures[7]?.error ?? {})).toEqual(["code", "currentRevision"]);
+    expect(safeFailures.every((failure) => !("message" in failure.error))).toBe(true);
+  });
+
+  describe("external GARFEX request validation", () => {
+    it("recognizes only the closed operation set", () => {
+      for (const operation of expectedOperations) {
+        expect(parseExternalOperationIdentifier(operation)).toBe(operation);
+      }
+      expectInvalid(parseExternalOperationIdentifier("newInternalOperation"), "operation");
+      expectInvalid(parseExternalOperationIdentifier({ operation: "getTaxonomy" }), "operation");
+      expectInvalid(parseExternalOperationIdentifier(null), "operation");
+    });
+
+    it("rebuilds every closed request and preserves omitted search optionals", () => {
+      for (const operation of externalOperationIdentifiers) {
+        const input = ordinaryRequests[operation];
+        const result = requestValidators[operation](input);
+        expect(result).toEqual(input);
+        expect(result).not.toBe(input);
+      }
+
+      const search = requestValidators.searchResources({ terms: "wire" });
+      expect(search).toEqual({ terms: "wire" });
+      expect(Object.keys(search as Record<string, unknown>)).toEqual(["terms"]);
+
+      const completeSearch = requestValidators.searchResources({
+        terms: "wire",
+        cursor: null,
+        limit: 50,
+        lifecycle: "ALL",
+      });
+      expect(completeSearch).toEqual({
+        terms: "wire",
+        cursor: null,
+        limit: 50,
+        lifecycle: "ALL",
+      });
+    });
+
+    it("fails closed for malformed requests and stable field paths", () => {
+      for (const validator of Object.values(requestValidators)) {
+        for (const value of [null, [], new Date()]) {
+          expectInvalid(validator(value));
+        }
+      }
+
+      const missingFields: Array<[RequestValidator, unknown, string]> = [
+        [
+          validateExternalGetEffectiveResourceSchemaRequest,
+          { classCode: "c", familyCode: "f" },
+          "typeCode",
+        ],
+        [validateExternalGetValidOptionsRequest, {}, "attributeCode"],
+        [validateExternalGetNaturalUnitsRequest, {}, "familyCode"],
+        [validateExternalGetResourceRequest, {}, "resourceId"],
+        [validateExternalSearchResourcesRequest, {}, "terms"],
+        [validateExternalDescribeResourceRequest, {}, "resourceId"],
+        [
+          validateExternalCreateResourceRequest,
+          { classCode: "c", familyCode: "f", typeCode: "t", naturalUnitCode: "u" },
+          "attributes",
+        ],
+        [
+          validateExternalUpdateNonIdentityDataRequest,
+          { resourceId: "r", naturalUnitCode: "u" },
+          "expectedRevision",
+        ],
+        [validateExternalDeactivateResourceRequest, { expectedRevision: 0 }, "resourceId"],
+      ];
+      for (const [validator, value, path] of missingFields) {
+        expectInvalid(validator(value), path);
+      }
+
+      expectInvalid(validateExternalGetTaxonomyRequest({ extra: true }), "extra");
+      expectInvalid(validateExternalGetResourceRequest({ resourceId: 4 }), "resourceId");
+      expectInvalid(
+        validateExternalGetResourceRequest({ resourceId: "r", actorId: "forged" }),
+        "actorId",
+      );
+      expectInvalid(
+        validateExternalCreateResourceRequest({
+          classCode: "c",
+          familyCode: "f",
+          typeCode: "t",
+          naturalUnitCode: "u",
+          attributes: { actorId: "forged" },
+        }),
+        "attributes.actorId",
+      );
+      expectInvalid(
+        validateExternalCreateResourceRequest({
+          classCode: "c",
+          familyCode: "f",
+          typeCode: "t",
+          naturalUnitCode: "u",
+          attributes: { providerId: "forged" },
+        }),
+        "attributes.providerId",
+      );
+      expectInvalid(
+        validateExternalCreateResourceRequest({
+          classCode: "c",
+          familyCode: "f",
+          typeCode: "t",
+          naturalUnitCode: "u",
+          attributes: {
+            quantity: { magnitude: "1", unitCode: "m", extra: true },
+          },
+        }),
+        "attributes.quantity",
+      );
+      expectInvalid(
+        validateExternalCreateResourceRequest({
+          classCode: "c",
+          familyCode: "f",
+          typeCode: "t",
+          naturalUnitCode: "u",
+          attributes: { quantity: 12 },
+        }),
+        "attributes.quantity",
+      );
+
+      for (const value of [0, 51, 1.5]) {
+        expectInvalid(
+          validateExternalSearchResourcesRequest({ terms: "wire", limit: value }),
+          "limit",
+        );
+      }
+      expectInvalid(
+        validateExternalSearchResourcesRequest({ terms: "wire", lifecycle: "BROKEN" }),
+        "lifecycle",
+      );
+      for (const value of ["", "line\nfeed", 2]) {
+        expectInvalid(
+          validateExternalSearchResourcesRequest({ terms: "wire", cursor: value }),
+          "cursor",
+        );
+      }
+      for (const value of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        expectInvalid(
+          validateExternalDeactivateResourceRequest({ resourceId: "r", expectedRevision: value }),
+          "expectedRevision",
+        );
+      }
+    });
+
+    it("rejects unknown authority fields for every request shape", () => {
+      const unknownFieldRequests: Array<[ExternalOperation, unknown, string]> = [
+        [
+          "getEffectiveResourceSchema",
+          { classCode: "c", familyCode: "f", typeCode: "t", actorId: "x" },
+          "actorId",
+        ],
+        ["getValidOptions", { attributeCode: "a", role: "x" }, "role"],
+        ["getNaturalUnits", { familyCode: "f", capability: "x" }, "capability"],
+        ["getResource", { resourceId: "r", token: "x" }, "token"],
+        ["searchResources", { terms: "x", claims: "x" }, "claims"],
+        ["describeResource", { resourceId: "r", session: "x" }, "session"],
+        [
+          "createResource",
+          {
+            classCode: "c",
+            familyCode: "f",
+            typeCode: "t",
+            naturalUnitCode: "u",
+            attributes: {},
+            actor: "x",
+          },
+          "actor",
+        ],
+        [
+          "updateNonIdentityData",
+          { resourceId: "r", expectedRevision: 0, naturalUnitCode: "u", credentials: "x" },
+          "credentials",
+        ],
+        [
+          "deactivateResource",
+          { resourceId: "r", expectedRevision: 0, deploymentId: "x" },
+          "deploymentId",
+        ],
+      ];
+
+      for (const [operation, value, path] of unknownFieldRequests) {
+        expectInvalid(requestValidators[operation](value), path);
+      }
+
+      for (const key of [
+        "actorId",
+        "providerId",
+        "sessionId",
+        "convexId",
+        "repositoryId",
+        "deploymentId",
+        "catalogAdmin",
+      ]) {
+        const attributes: Record<string, unknown> = { [key]: "forged" };
+        expectInvalid(
+          validateExternalCreateResourceRequest({
+            classCode: "c",
+            familyCode: "f",
+            typeCode: "t",
+            naturalUnitCode: "u",
+            attributes,
+          }),
+          `attributes.${key}`,
+        );
+      }
+    });
+  });
 });
