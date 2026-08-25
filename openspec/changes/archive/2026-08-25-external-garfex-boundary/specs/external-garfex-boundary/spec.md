@@ -379,3 +379,83 @@ External contract sources, runtime values, generated artifacts if any are later 
 - WHEN architecture checks run
 - THEN the checks fail
 
+#### Scenario: Extra internal response field cannot drift outward
+
+- GIVEN an internal Resource Master response gains a new field
+- WHEN existing external projection and fixtures run unchanged
+- THEN the new field is absent externally
+- AND compatibility checks detect any attempted unreviewed publication
+
+### Requirement: Compatibility and drift detection
+
+GARFEX MUST own compatibility for operation identifiers, request meanings, projected success fields, external error codes, and allowlisted metadata. Automated checks MUST cover all ten operation mappings, closed input shapes, output projections, normalized failures, unknown operations, forged authority, authorization preservation, and architecture rules. Representative success and applicable failure fixtures MUST exist for every operation. Changes to externally observable semantics MUST require explicit review and documented migration intent; internal changes MUST NOT alter the external surface silently.
+
+#### Scenario: Mapping parity detects omission or redirection
+
+- GIVEN an approved operation is missing, duplicated, or mapped to the wrong Resource Master operation
+- WHEN parity and mapper checks run
+- THEN the checks fail
+
+#### Scenario: Fixture detects compatibility drift
+
+- GIVEN an operation adds, removes, renames, or changes an external field, error code, or allowlisted metadata item
+- WHEN representative compatibility fixtures run
+- THEN the unreviewed change fails
+
+#### Scenario: Every operation has success and failure evidence
+
+- GIVEN the compatibility suite
+- WHEN its operation coverage is enumerated
+- THEN every approved operation has at least one representative success fixture
+- AND every applicable normalized failure meaning has representative coverage
+
+### Requirement: Architecture fitness enforcement
+
+Repository architecture checks MUST reject client-facing dependency on backend internals or trusted auth concepts, authority-bearing DTO fields, Convex/generated/platform leakage, persistence or deployment leakage, generic business executors, arbitrary CRUD or repository publication, and mechanical external derivation from the module contract. The checks MUST include controlled valid and violating fixtures so the rule itself is testable.
+
+#### Scenario: Safe independent contract passes
+
+- GIVEN an independently defined external contract with only reviewed business DTOs
+- WHEN architecture checks run
+- THEN the contract passes the external-boundary rules
+
+#### Scenario: Each prohibited pattern has a failing fixture
+
+- GIVEN controlled fixtures for internal imports, authority fields, Convex/generated types, persistence values, generic forwarding, and automatic publication
+- WHEN architecture checks run against each fixture
+- THEN each fixture fails for its intended named rule
+
+### Requirement: Canonical boundary documentation
+
+Canonical documentation MUST distinguish the External Client Contract from the Resource Master Public Application Contract, identify GARFEX as external compatibility owner, list exactly the ten approved operations and their one-to-one mappings, describe trusted identity construction and final module authorization, define the reviewed success and safe error semantics, state that Convex is infrastructure rather than a business API, and record all explicit technological non-decisions. Machine-readable identifiers and compatibility fixtures MUST remain consistent with this canonical documentation.
+
+#### Scenario: Documentation matches executable semantics
+
+- GIVEN the canonical operation and error tables and the external contract identifiers
+- WHEN documentation parity is checked
+- THEN all operation identifiers, mappings, error codes, and allowlisted metadata agree
+
+#### Scenario: Non-decisions remain open
+
+- GIVEN the canonical documentation
+- WHEN its scope and non-goals are reviewed
+- THEN it selects no transport or protocol
+- AND it selects no schema, IDL, runtime-validation, or generation technology
+- AND it selects no SDK, artifact packaging, hosting, registry, or distribution approach
+- AND it selects no productive identity provider or credential/session mechanism
+- AND it assumes no consumer implementation or behavior
+
+## Acceptance Criteria
+
+- [ ] The external contract recognizes exactly the ten approved operation identifiers and fails closed for every unknown or unmapped identifier.
+- [ ] Closed request DTOs contain only reviewed business input and reject authority-bearing, internal, persistence, deployment, catalog-administration, and Convex fields.
+- [ ] Trusted server authentication constructs the actor separately, while unauthenticated requests stop before all Resource Master and downstream work.
+- [ ] Each operation explicitly maps to only its corresponding real Resource Master public application operation.
+- [ ] Existing exact deny-by-default Resource Master authorization remains the final capability enforcement before data access.
+- [ ] Every external input and every projected success or failure receives closed runtime validation.
+- [ ] Success values preserve the listed public business outcomes through field-by-field projection, including bounded opaque pagination.
+- [ ] Stable machine error codes and only allowlisted corrective metadata cover unauthenticated, forbidden, invalid argument, invalid reference, validation, not found, duplicate, conflict, lifecycle, catalog-state, integrity, and unexpected failures.
+- [ ] Internal messages, stacks, provider, authentication, persistence, Convex, catalog-configuration, and deployment details cannot leak.
+- [ ] Compatibility fixtures, operation parity, mapper tests, projection tests, sanitization tests, forgery tests, and architecture fixtures detect unreviewed drift.
+- [ ] No generic business API, automatic module publication, arbitrary CRUD, repository API, or Convex business API exists.
+- [ ] Canonical documentation identifies GARFEX ownership, distinguishes both contracts, agrees with executable identifiers, and preserves every explicit technological non-decision.
