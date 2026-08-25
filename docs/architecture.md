@@ -16,6 +16,7 @@ apps/backend/
 ├── src/
 │   ├── index.ts                         # package-level public type exports
 │   ├── auth/                            # identity, composition, roles, and edge enforcement
+│   ├── external-garfex-boundary/        # independent external semantics and trusted edge
 │   └── resource-master/
 │       ├── public.ts                    # stable actor, capability, and DTO contracts
 │       ├── index.ts                     # Resource Master public type exports
@@ -51,11 +52,12 @@ application dependency.
 The runtime flow is:
 
 ```text
-Transport/composition -> trusted ActorContext + business input
-                                  |
-                                  v
-Public capability -> Application authorization -> Domain rules + Repository port
-                                                 Repository port <- Infrastructure/Convex adapter
+    Untrusted external business input
+      -> external GARFEX validation -> trusted ActorContext + business input
+                                      |
+                                      v
+    Resource Master public capability -> Application authorization -> Domain rules + Repository port
+                                                                    Repository port <- Infrastructure/Convex adapter
 ```
 
 Dependency inversion is intentional. Transport/composition authenticates and constructs trusted actor
@@ -79,8 +81,9 @@ application contract, not an external client-facing contract. Untrusted external
 backend source, package, schema, or generated binding; any future cross-repository artifact requires a
 separate explicitly public, versioned, client-safe decision. Public operation signatures receive
 trusted `ActorContext` separately and actor-first from business input, and that trusted server-side
-context is never exposed as client authority. See the
-[independent external client boundary](./external-client-boundary.md).
+context is never exposed as client authority. The concrete ten-operation semantic boundary is recorded
+in the [canonical GARFEX boundary](./external-garfex-boundary.md); repository independence remains in
+the [independent external client boundary](./external-client-boundary.md).
 
 ## Convex isolation
 
@@ -93,8 +96,10 @@ Convex is the current runtime adapter, not the owner of business behavior.
 - `ConvexResourceRepository` implements the application-owned repository port and is the only core
   adapter that reads or writes Convex database values.
 - `convex/schema.ts` owns the Resource tables and the bounded `resourceCatalogSnapshots` aggregate/index.
-- Convex SDK and generated types stay out of `public.ts`, `application/`, and `domain/`.
-- The in-memory repository remains available for behavior tests without a platform runtime.
+  - Convex SDK and generated types stay out of `public.ts`, `application/`, and `domain/`.
+  - The external GARFEX contract does not import or derive from Convex; it reaches business behavior only
+      through the trusted Resource Master public application contract.
+  - The in-memory repository remains available for behavior tests without a platform runtime.
 
 ## Persistent catalog authority and operations
 
