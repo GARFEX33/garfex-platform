@@ -29,6 +29,7 @@ pnpm check
 | `docs/architecture.md` | Current layer rules and the shape required for future modules. |
 | `docs/auth-boundary.md` | Accepted auth boundary, implemented Resource Master capability map, local-development identity limits, and deferred productive auth work. |
 | `docs/surface-ui-harness-boundary.md` | Accepted separation of human-facing Surface/UI and agent Harness roles. |
+| `docs/external-client-boundary.md` | Accepted independent boundary between this backend and untrusted external clients. |
 
 ## Work with the backend
 
@@ -83,16 +84,21 @@ for boundary ownership, the operation map, and deferred productive auth work.
 
 ## Boundaries and scope
 
-The supported dependency shape is Public capability -> Application -> Domain + Application Port ->
-Infrastructure/Convex adapter. Source dependencies remain inverted: application owns the port, and
-infrastructure implements it. Consumers use `resource-master/public.ts`; Convex entrypoints may
-import the infrastructure composition adapter but not domain or application internals.
+The supported backend dependency shape is Public capability -> Application -> Domain + Application
+Port -> Infrastructure/Convex adapter. Source dependencies remain inverted: application owns the
+port, and infrastructure implements it. In-repository backend consumers use
+`resource-master/public.ts`; Convex entrypoints may import the infrastructure composition adapter but
+not domain or application internals. External clients do not import that module contract or any
+backend source. They may cross repositories only through a separately decided, explicitly public,
+versioned, client-safe external contract; no such transport, schema, or SDK is selected here.
 
 Only the Cable catalog (`MATERIAL / CONDUCTORES / CABLE`) exists today. Other resource families,
 additional business modules, UI/API transports beyond Convex functions, Temporal workflows, agent
 integrations, and production deployment automation are explicitly deferred. There is no User module or
 persistence, user management, login UI, productive identity provider, or productive auth strategy. Pi
-remains a future replaceable Surface/UI, and its final transport remains open.
+remains a future replaceable Surface/UI, and its final transport and physical implementation location
+remain open. Its source cannot be placed or linked into this backend as a way to resolve that choice.
+See [`docs/external-client-boundary.md`](docs/external-client-boundary.md).
 
 ## Persistent Resource Catalog authority
 

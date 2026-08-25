@@ -73,9 +73,14 @@ application/domain types. The core never imports an adapter or platform SDK.
 | `infrastructure/` | Convex catalog/repository and in-memory implementations; may implement ports and compose use cases. |
 | `convex/` | Runtime validators, schema, bootstrap, and exported functions; may call the Convex infrastructure composition only. |
 
-Consumers outside Resource Master import its `public.ts` surface (or the package-level type
-re-export), never `domain/`, `application/`, or `infrastructure/` internals. Public operation signatures
-receive trusted `ActorContext` separately and actor-first from business input.
+Backend consumers outside Resource Master import its `public.ts` surface (or the package-level type
+re-export), never `domain/`, `application/`, or `infrastructure/` internals. This is an in-process module
+application contract, not an external client-facing contract. Untrusted external clients import no
+backend source, package, schema, or generated binding; any future cross-repository artifact requires a
+separate explicitly public, versioned, client-safe decision. Public operation signatures receive
+trusted `ActorContext` separately and actor-first from business input, and that trusted server-side
+context is never exposed as client authority. See the
+[independent external client boundary](./external-client-boundary.md).
 
 ## Convex isolation
 
@@ -117,7 +122,9 @@ snapshot exists, fail closed and fix forward—never restore the fixture or add 
 ## Architecture checks
 
 `dependency-cruiser` builds the import graph. `tooling/architecture/check.mjs` adds ownership-aware
-rules and excludes `convex/_generated/` from cruising. The checks reject:
+rules, repository-local metadata and source checks, and excludes `convex/_generated/` from cruising.
+The checker inspects only this repository or an explicitly supplied controlled fixture root; it never
+inspects the sibling UI repository. The checks reject:
 
 - circular, unresolved, undeclared, and unknown package dependencies;
 - platform dependencies in Resource Master public/domain/application code;
@@ -126,8 +133,12 @@ rules and excludes `convex/_generated/` from cruising. The checks reject:
 - domain imports outside Resource Master domain;
 - application imports of infrastructure;
 - public contracts that expose internals;
-- Convex entrypoints that import domain/application internals; and
-- non-test consumers that bypass the Resource Master public surface.
+- Convex entrypoints that import domain/application internals;
+- non-test backend consumers that bypass the Resource Master public surface;
+- backend source, package, Git, workspace, project, filesystem, submodule, or symlink coupling to
+  `garfex-platform-ui`; and
+- future `client-facing` contract source that imports backend internals or leaks trusted actor,
+  provider, role, or capability concepts.
 
 Run the focused architecture gate and the complete build graph with:
 
@@ -167,8 +178,10 @@ src/modules/<module>/
 6. Add behavior and architecture coverage, then run `pnpm check`.
 
 Temporal workflows, agent harnesses, additional transports, and other persistence technologies are
-not implemented. When introduced, they remain edge adapters and follow the same public contract and
-ownership rules rather than becoming dependencies of core code. Provider-neutral actor contracts,
+not implemented. When introduced, they remain edge adapters and follow the same backend module
+contract and ownership rules rather than becoming dependencies of core code. An external client still
+requires a distinct client-facing boundary; “GARFEX client” does not imply a shared package or SDK.
+Provider-neutral actor contracts,
 transport-edge authentication composition, and Resource Master capability authorization are implemented.
 The only identity implementation is an explicit fail-closed local-development adapter; there is no
 productive identity provider, login UI, User module, or productive auth strategy. See

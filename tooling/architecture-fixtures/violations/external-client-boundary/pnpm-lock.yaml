@@ -1,0 +1,5 @@
+lockfileVersion: '9.0'
+
+packages:
+  '@garfex/ui@git+ssh://git@example.invalid/garfex-platform-ui.git':
+    resolution: {repo: 'git+ssh://git@example.invalid/garfex-platform-ui.git'}

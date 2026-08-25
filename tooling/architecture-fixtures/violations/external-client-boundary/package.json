@@ -1,0 +1,14 @@
+{
+  "name": "external-client-boundary-violation",
+  "private": true,
+  "dependencies": {
+    "garfex-platform-ui": "git+ssh://git@example.invalid/garfex-platform-ui.git"
+  },
+  "scripts": {
+    "build:surface": "tsx ../../../../garfex-platform-ui/scripts/build.ts"
+  },
+  "tooling": {
+    "surfacePackage": "@garfex/surface",
+    "sourceDirectory": "../../../../garfex-platform-ui/src"
+  }
+}

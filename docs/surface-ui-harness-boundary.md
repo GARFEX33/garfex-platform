@@ -40,7 +40,7 @@ Module
 
 CRUD, queries, search, navigation, catalog reads, forms, and other deterministic user actions follow this route. Deterministic CRUD must not depend on an Agent Platform, Harness, LLM, model/provider, or agentic execution.
 
-The `GARFEX client transport / composition edge` and the `Module public application contract` are separate boundaries. Framework-neutral module contracts do not permit an external Surface to import module internals or access internal layers. The physical transport remains open: this decision does not select HTTP, RPC, Convex transport, an SDK, JSONL, in-process, out-of-process, or any other mechanism.
+The `GARFEX client transport / composition edge` and the `Module public application contract` are separate boundaries. The module contract is an in-process backend boundary, not an external client-facing contract. An external Surface cannot import `public.ts`, backend source, internal packages, schemas, or generated bindings. Any cross-repository artifact requires the separately accepted [independent external client boundary](./external-client-boundary.md). The physical transport remains open: this decision does not select HTTP, RPC, Convex transport, an SDK, JSONL, in-process, out-of-process, or any other mechanism. “GARFEX client” names a consumer role and does not imply a backend-internal/shared package or SDK.
 
 #### Future agentic route
 
@@ -78,7 +78,7 @@ Pi remains only a future Harness candidate.
 
 #### Business ownership
 
-Both routes ultimately consume GARFEX capabilities through the owning modules' public application contracts. Modules retain ownership of business rules, invariants, operations, final authorization, public errors, and persistence.
+Both routes ultimately reach GARFEX capabilities through a GARFEX-owned edge and the owning modules' public application contracts. External consumers do not consume those module contracts directly. Modules retain ownership of business rules, invariants, operations, final authorization, public errors, and persistence.
 
 Consuming a capability gives no business ownership to the Surface, Harness, or Agent Platform.
 
@@ -122,11 +122,11 @@ Infrastructure substitution, including placing Convex behind adapters, must not 
 - Surface and Harness implementations can evolve or be replaced independently.
 - Deterministic operations avoid agentic complexity, cost, latency, and failure modes.
 - Business ownership and final authorization remain stable in the owning modules.
-- Module public contracts remain the shared capability boundary for deterministic and agentic consumers.
+- Module public contracts remain the internal capability boundary behind GARFEX-controlled external and agent edges.
 
 #### Negative
 
-- GARFEX must define and maintain a client transport/composition edge in addition to module public contracts.
+- GARFEX must separately define and maintain an explicitly public, versioned, client-safe external contract and client transport/composition edge in addition to module public contracts.
 - Future agentic work also requires a GARFEX-controlled agent capability boundary.
 - A product that physically combines Surface and Harness mechanisms must still preserve their logical separation.
 
@@ -140,8 +140,8 @@ Infrastructure substitution, including placing Convex behind adapters, must not 
 This decision intentionally leaves the following open:
 
 - the physical Pi ↔ GARFEX transport;
-- the physical location or repository of the Pi Surface implementation;
-- SDK, RPC, HTTP, Convex transport, or another transport;
+- the physical location or repository of the Pi Surface implementation, except that it cannot be resolved by putting or linking Surface source into this backend repository;
+- whether any public SDK exists, and RPC, HTTP, Convex transport, or another transport;
 - the first real Harness;
 - Pi SDK versus RPC if Pi is later selected as a Harness;
 - model and provider selection;
@@ -152,7 +152,7 @@ This decision intentionally leaves the following open:
 
 ## CURRENT IMPLEMENTATION STATUS
 
-Resource Master is currently the only implemented capability. Its auth boundary is materialized without implementing or selecting a Surface transport. No Pi Surface or Harness integration, Agent Platform, GARFEX Tools, productive identity provider, model/provider integration, or agentic execution is implemented.
+Resource Master is currently the only implemented capability. Its auth boundary is materialized without implementing or selecting a Surface transport. No external client-facing contract, SDK, Pi Surface or Harness integration, Agent Platform, GARFEX Tools, productive identity provider, model/provider integration, or agentic execution is implemented.
 
 Architecture fixtures are dependency-rule fixtures; they are not an Agent Platform implementation.
 
@@ -162,6 +162,7 @@ This decision does not select a transport or first Harness, deploy anything to p
 
 - [`docs/architecture.md`](./architecture.md) defines module ownership, stable public application contracts, internal dependency rules, and infrastructure isolation.
 - [`docs/auth-boundary.md`](./auth-boundary.md) is the accepted provider-neutral authentication and authorization decision.
+- [`docs/external-client-boundary.md`](./external-client-boundary.md) defines the accepted independent boundary between this backend and untrusted external clients.
 - [`README.md`](../README.md) describes current repository scope and provides the repository map.
 
 This decision does not supersede the auth or module-boundary decisions. It replaces no prior decision.

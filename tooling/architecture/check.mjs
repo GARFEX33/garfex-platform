@@ -1,9 +1,69 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { relative, resolve, sep } from "node:path";
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  readlinkSync,
+  realpathSync,
+} from "node:fs";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import process from "node:process";
 
 const root = resolve(import.meta.dirname, "../..");
+const counterpartName = ["garfex-platform", "ui"].join("-");
+const ignoredDirectories = new Set([
+  ".codegraph",
+  ".git",
+  ".pnpm-store",
+  "coverage",
+  "dist",
+  "node_modules",
+]);
+const sourceExtension = /\.[cm]?[jt]sx?$/;
+const dependencyFields = [
+  "dependencies",
+  "devDependencies",
+  "optionalDependencies",
+  "peerDependencies",
+];
+
+const normalize = (path) => path.split(sep).join("/");
+const isWithin = (parent, candidate) => {
+  const pathFromParent = relative(parent, candidate);
+  return pathFromParent === "" || (!pathFromParent.startsWith("..") && !isAbsolute(pathFromParent));
+};
+const displayPath = (path) =>
+  isWithin(root, path) ? normalize(relative(root, path)) : normalize(path);
+const targetsCounterpart = (value) => value.toLowerCase().includes(counterpartName);
+const targetsCounterpartPackage = (value) => {
+  const reference = value.trim();
+  if (reference === "" || /\s/.test(reference)) return false;
+
+  return (
+    targetsCounterpart(reference) ||
+    /(?:^|[/\\])@garfex[/\\](?:ui|surface|platform-ui)(?:[/\\@]|$)/i.test(reference) ||
+    /(?:^|[/\\])garfex-(?:platform-)?(?:ui|surface)(?:[./\\@]|$)/i.test(reference)
+  );
+};
+const quotedValues = (source) => [...source.matchAll(/(["'])([^"']+)\1/g)].map((match) => match[2]);
+const operationalValues = (source) => [
+  ...quotedValues(source),
+  ...[...source.matchAll(/(?:^|[:\-]\s*)([^\s#"']+)/gm)].map((match) => match[1]),
+];
+const nestedStringValues = (value) => {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(nestedStringValues);
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).flatMap(nestedStringValues);
+  }
+  return [];
+};
+const startupError = (message) => {
+  console.error(`architecture checker configuration error: ${message}`);
+  process.exit(2);
+};
+
 const workspaceMembers = ["apps", "packages"].flatMap((workspaceDirectory) => {
   const absoluteDirectory = resolve(root, workspaceDirectory);
   if (!existsSync(absoluteDirectory)) return [];
@@ -23,6 +83,13 @@ const targets =
   requestedTargets.length > 0
     ? requestedTargets.map((target) => resolve(root, target))
     : [resolve(root, "tooling/architecture-fixtures/valid"), ...workspaceMembers];
+
+for (const target of targets) {
+  if (!existsSync(target)) startupError(`target does not exist: ${displayPath(target)}`);
+  if (!isWithin(root, target) && targetsCounterpart(target)) {
+    startupError(`refusing to inspect counterpart repository: ${displayPath(target)}`);
+  }
+}
 
 const dependencyCruiser = resolve(
   root,
@@ -57,7 +124,6 @@ try {
   process.exit(2);
 }
 
-const normalize = (path) => path.split(sep).join("/");
 const moduleName = (path) => /(?:^|\/)modules\/([^/]+)\//.exec(path)?.[1];
 const isPublicSurface = (path) =>
   /(?:^|\/)modules\/[^/]+\/public\.[cm]?[jt]s$/.test(path) ||
@@ -102,6 +168,25 @@ const isBannedCoreDependency = (path) =>
   /(?:^|\/)convex\//.test(path) ||
   /(?:^|\/)_generated\//.test(path) ||
   /(?:^|\/)(?:infrastructure|deployment|ui|http|agents?)\//.test(path);
+const isClientFacingSource = (path) => /(?:^|\/)client-facing(?:\/|\.|$)/.test(path);
+const importSpecifiers = (source) =>
+  [...source.matchAll(/(?:from\s*|import\s*(?:\(\s*)?|require\s*\()(["'])([^"']+)\1/g)].map(
+    (match) => match[2],
+  );
+const stringReferencesCounterpartPackage = (source) =>
+  quotedValues(source).some(targetsCounterpartPackage);
+const isForbiddenClientContractImport = (specifier) =>
+  /(?:^|\/)(?:convex|_generated|infrastructure|persistence)(?:\/|$)/i.test(specifier) ||
+  /(?:^|\/)apps\/backend\//i.test(specifier) ||
+  /(?:^|\/)resource-master\/(?:public(?:\.[cm]?[jt]s)?$|domain|application|deployment)(?:\/|$)/i.test(
+    specifier,
+  ) ||
+  /(?:^|\/)modules\/[^/]+\/public(?:\.[cm]?[jt]s)?$/i.test(specifier);
+const hasTrustedAuthLeak = (source) =>
+  /\b(?:ActorContext|ProviderClaims|ProviderIdentity|ProviderSubject|ConvexIdentity|SessionIdentity|Role|Capability)\b/.test(
+    source,
+  ) ||
+  /(?:from\s*|import\s*\(|require\s*\()(["'])[^"']*(?:auth|authorization)[^"']*\1/i.test(source);
 const violations = new Map();
 
 const addViolation = (rule, from, to) => {
@@ -250,6 +335,142 @@ for (const module of report.modules ?? []) {
     }
   }
 }
+
+const scanRoots = requestedTargets.length > 0 ? targets : [root];
+const scan = (scanRoot, current = scanRoot) => {
+  const entry = lstatSync(current);
+  const from = displayPath(current);
+
+  if (entry.isSymbolicLink()) {
+    const linkTarget = readlinkSync(current);
+    let resolvedTarget;
+    try {
+      resolvedTarget = realpathSync(current);
+    } catch {
+      resolvedTarget = resolve(dirname(current), linkTarget);
+    }
+    if (!isWithin(scanRoot, resolvedTarget) && targetsCounterpartPackage(resolvedTarget)) {
+      addViolation("external-client-no-counterpart-symlink", from, normalize(resolvedTarget));
+    }
+    return;
+  }
+
+  if (entry.isDirectory()) {
+    for (const child of readdirSync(current, { withFileTypes: true })) {
+      if (ignoredDirectories.has(child.name)) continue;
+      if (
+        scanRoot === root &&
+        normalize(relative(root, current)) === "tooling/architecture-fixtures" &&
+        child.name === "violations"
+      ) {
+        continue;
+      }
+      if (child.name.startsWith(".") && child.name !== ".gitmodules") continue;
+      scan(scanRoot, resolve(current, child.name));
+    }
+    return;
+  }
+
+  const name = current.split(sep).at(-1) ?? "";
+  const isSource = sourceExtension.test(name);
+  const isPackageManifest = name === "package.json";
+  const isWorkspaceMetadata =
+    name === "pnpm-workspace.yaml" || /^tsconfig(?:\.[^.]+)?\.json$/.test(name);
+  const isGitmodules = name === ".gitmodules";
+  const isLockfile = new Set(["pnpm-lock.yaml", "package-lock.json", "yarn.lock"]).has(name);
+  const isConfiguration =
+    /\.(?:json|ya?ml|toml)$/.test(name) &&
+    !isPackageManifest &&
+    !isWorkspaceMetadata &&
+    !isLockfile;
+  if (
+    !isSource &&
+    !isPackageManifest &&
+    !isWorkspaceMetadata &&
+    !isGitmodules &&
+    !isLockfile &&
+    !isConfiguration
+  ) {
+    return;
+  }
+
+  const source = readFileSync(current, "utf8");
+  if (isSource) {
+    const specifiers = importSpecifiers(source);
+    if (
+      specifiers.some(targetsCounterpartPackage) ||
+      stringReferencesCounterpartPackage(source) ||
+      specifiers.some((specifier) => {
+        if (!specifier.startsWith(".")) return false;
+        const destination = resolve(dirname(current), specifier);
+        return !isWithin(root, destination) && targetsCounterpartPackage(destination);
+      })
+    ) {
+      addViolation("external-client-no-counterpart-source-reference", from, counterpartName);
+    }
+    if (isClientFacingSource(normalize(current))) {
+      for (const specifier of specifiers.filter(isForbiddenClientContractImport)) {
+        addViolation("client-facing-no-backend-internals", from, specifier);
+      }
+      if (hasTrustedAuthLeak(source)) {
+        addViolation("client-facing-no-trusted-auth-internals", from, "<source>");
+      }
+    }
+  }
+
+  if (isPackageManifest) {
+    let manifest;
+    try {
+      manifest = JSON.parse(source);
+    } catch {
+      startupError(`invalid package manifest: ${from}`);
+    }
+    for (const field of dependencyFields) {
+      for (const [dependency, value] of Object.entries(manifest[field] ?? {})) {
+        if (targetsCounterpartPackage(dependency) || targetsCounterpartPackage(String(value))) {
+          addViolation("external-client-no-counterpart-dependency", from, `${dependency}@${value}`);
+        }
+      }
+    }
+    if (nestedStringValues(manifest.workspaces ?? []).some(targetsCounterpartPackage)) {
+      addViolation("external-client-no-counterpart-workspace-link", from, "workspaces");
+    }
+    if (nestedStringValues(manifest).some(targetsCounterpartPackage)) {
+      addViolation("external-client-no-counterpart-package-config", from, "<manifest>");
+    }
+  }
+
+  if (isWorkspaceMetadata && operationalValues(source).some(targetsCounterpartPackage)) {
+    addViolation("external-client-no-counterpart-workspace-link", from, counterpartName);
+  }
+  if (isConfiguration && operationalValues(source).some(targetsCounterpartPackage)) {
+    addViolation("external-client-no-counterpart-config-reference", from, counterpartName);
+  }
+  if (isLockfile) {
+    const hasCounterpartGitBinding = source
+      .split("\n")
+      .some(
+        (line) =>
+          /(?:git\+|git@|github:|https?:\/\/[^\s"']+\.git(?:[#?]|$))/i.test(line) &&
+          operationalValues(line).some(targetsCounterpartPackage),
+      );
+    const hasEscapingCounterpartLocalBinding = [
+      ...source.matchAll(/(?:file|link):([^\s"',}\]]+)/gi),
+    ].some((match) => {
+      const binding = match[1];
+      const destination = resolve(dirname(current), binding);
+      return !isWithin(root, destination) && targetsCounterpartPackage(destination);
+    });
+    if (hasCounterpartGitBinding || hasEscapingCounterpartLocalBinding) {
+      addViolation("external-client-no-counterpart-lockfile", from, counterpartName);
+    }
+  }
+  if (isGitmodules && targetsCounterpart(source)) {
+    addViolation("external-client-no-counterpart-gitmodule", from, counterpartName);
+  }
+};
+
+for (const scanRoot of scanRoots) scan(scanRoot);
 
 if (violations.size > 0) {
   for (const { rule, from, to } of violations.values()) {
