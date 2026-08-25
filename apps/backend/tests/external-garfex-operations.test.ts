@@ -157,6 +157,154 @@ describe("external GARFEX success projections", () => {
     expectValidated(projectedOptions, validators.validateExternalGetValidOptionsSuccess);
     expectValidated(projectedUnits, validators.validateExternalGetNaturalUnitsSuccess);
   });
+
+  it("projects resources through each named operation wrapper and limits quantities", () => {
+    const quantity = {
+      magnitude: "12",
+      unitCode: "awg",
+      internalUnitId: "unit-secret",
+    };
+    const resource = {
+      resourceId: "resource-1",
+      classCode: "hardware",
+      familyCode: "wire",
+      typeCode: "solid-wire",
+      naturalUnitCode: "meter",
+      attributes: [
+        {
+          attributeCode: "finish",
+          value: "bare",
+          displayValue: "Bare",
+          identityParticipating: true,
+          internalAttributeId: "attribute-secret",
+        },
+        {
+          attributeCode: "gauge",
+          value: quantity,
+          displayValue: "12",
+          identityParticipating: true,
+          internalAttributeId: "attribute-secret",
+        },
+      ],
+      canonicalIdentity: "hardware|wire|solid-wire|finish=bare|gauge=12-awg",
+      identityPolicyVersion: "v1",
+      active: true,
+      revision: 3,
+      internalDocumentId: "document-secret",
+      actorId: "forged-actor",
+      convexId: "convex-secret",
+    } as unknown as ResourceView;
+    const expected = {
+      resourceId: "resource-1",
+      classCode: "hardware",
+      familyCode: "wire",
+      typeCode: "solid-wire",
+      naturalUnitCode: "meter",
+      attributes: [
+        {
+          attributeCode: "finish",
+          value: "bare",
+          displayValue: "Bare",
+          identityParticipating: true,
+        },
+        {
+          attributeCode: "gauge",
+          value: { magnitude: "12", unitCode: "awg" },
+          displayValue: "12",
+          identityParticipating: true,
+        },
+      ],
+      canonicalIdentity: "hardware|wire|solid-wire|finish=bare|gauge=12-awg",
+      identityPolicyVersion: "v1" as const,
+      active: true,
+      revision: 3,
+    };
+    const projected = [
+      projections.projectExternalGetResource(resource),
+      projections.projectExternalCreateResource(resource),
+      projections.projectExternalUpdateNonIdentityData(resource),
+      projections.projectExternalDeactivateResource(resource),
+    ];
+
+    for (const result of projected) {
+      expect(result).toEqual(expected);
+      expect(result).not.toBe(resource);
+      expect(result.attributes).not.toBe(resource.attributes);
+      expect(result.attributes[1]?.value).not.toBe(quantity);
+    }
+    expectValidated(projected[0], validators.validateExternalGetResourceSuccess);
+    expectValidated(projected[1], validators.validateExternalCreateResourceSuccess);
+    expectValidated(projected[2], validators.validateExternalUpdateNonIdentityDataSuccess);
+    expectValidated(projected[3], validators.validateExternalDeactivateResourceSuccess);
+  });
+
+  it("projects search and description while nulling missing continuation", () => {
+    const summary = {
+      resourceId: "resource-1",
+      classCode: "hardware",
+      className: "Hardware",
+      familyCode: "wire",
+      familyName: "Wire",
+      typeCode: "solid-wire",
+      typeName: "Solid wire",
+      naturalUnitCode: "meter",
+      description: "Hardware Wire Solid wire",
+      optionCodes: ["bare"],
+      optionLabels: ["Bare"],
+      values: ["Bare", "12"],
+      repositoryId: "repository-secret",
+    } as unknown as ResourceSummary;
+    const search = {
+      items: [summary],
+      cursor: undefined,
+      internalPageId: "page-secret",
+    } as unknown as SearchSuccess;
+    const description = {
+      resourceId: "resource-1",
+      description: "Hardware Wire Solid wire",
+      internalDocumentId: "document-secret",
+    } as unknown as DescriptionSuccess;
+
+    const projectedSearch = projections.projectExternalSearchResources(search);
+    const projectedDescription = projections.projectExternalDescribeResource(description);
+
+    expect(projectedSearch).toEqual({
+      items: [
+        {
+          resourceId: "resource-1",
+          classCode: "hardware",
+          className: "Hardware",
+          familyCode: "wire",
+          familyName: "Wire",
+          typeCode: "solid-wire",
+          typeName: "Solid wire",
+          naturalUnitCode: "meter",
+          description: "Hardware Wire Solid wire",
+          optionCodes: ["bare"],
+          optionLabels: ["Bare"],
+          values: ["Bare", "12"],
+        },
+      ],
+      cursor: null,
+    });
+    expect(projectedDescription).toEqual({
+      resourceId: "resource-1",
+      description: "Hardware Wire Solid wire",
+    });
+    expect(projectedSearch.items).not.toBe(search.items);
+    expect(projectedSearch.items[0]).not.toBe(summary);
+    expect(projectedSearch.items[0]?.optionCodes).not.toBe(summary.optionCodes);
+    expect(projectedDescription).not.toBe(description);
+
+    expectValidated(projectedSearch, validators.validateExternalSearchResourcesSuccess);
+    expectValidated(projectedDescription, validators.validateExternalDescribeResourceSuccess);
+
+    const continued = projections.projectExternalSearchResources({
+      ...search,
+      cursor: "opaque-cursor",
+    });
+    expect(continued.cursor).toBe("opaque-cursor");
+  });
 });
 
 const readActor = {
@@ -265,6 +413,97 @@ function runRead(
   };
   return testCase.invoke(rawRequest, dependencies);
 }
+
+describe("external GARFEX named read invocations", () => {
+  it.each(readCases)(
+    "$name validates, maps, projects, and calls only its matching method",
+    async (testCase) => {
+      const methods = readMethodSpies();
+      methods[testCase.method] = vi.fn(
+        async () => ({ ok: true, value: testCase.internal }) as never,
+      );
+      const resolveActor = vi.fn(async () => readActor);
+      const result = await runRead(testCase, testCase.request, methods, resolveActor);
+
+      expect(result).toEqual({ ok: true, value: testCase.internal });
+      expect(resolveActor).toHaveBeenCalledOnce();
+      expect(methods[testCase.method]).toHaveBeenCalledOnce();
+      const args = methods[testCase.method].mock.calls[0] as unknown[];
+      expect(args[0]).toBe(readActor);
+      if (testCase.mappedInput === null) {
+        expect(args).toHaveLength(1);
+      } else {
+        expect(args[1]).toEqual(testCase.mappedInput);
+        expect(args[1]).not.toBe(testCase.request);
+      }
+      for (const [method, spy] of Object.entries(methods)) {
+        if (method !== testCase.method) expect(spy).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it.each(readCases)(
+    "$name validates before auth and short-circuits unauthenticated calls",
+    async (testCase) => {
+      const methods = readMethodSpies();
+      const resolveActor = vi.fn<() => Promise<ActorContext | null>>(async () => {
+        throw new Error("authentication must not run");
+      });
+      const malformed = { ...testCase.request, unexpected: "secret" };
+      expect(await runRead(testCase, malformed, methods, resolveActor)).toEqual({
+        ok: false,
+        error: {
+          code: "INVALID_ARGUMENT",
+          fieldIssues: [{ path: "unexpected", reason: "UNKNOWN_FIELD" }],
+        },
+      });
+      expect(resolveActor).not.toHaveBeenCalled();
+
+      resolveActor.mockResolvedValue(null);
+      expect(await runRead(testCase, testCase.request, methods, resolveActor)).toEqual({
+        ok: false,
+        error: { code: "UNAUTHENTICATED" },
+      });
+      expect(resolveActor).toHaveBeenCalledOnce();
+      for (const spy of Object.values(methods)) expect(spy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(readCases)("$name normalizes a Resource Master failure", async (testCase) => {
+    const methods = readMethodSpies();
+    methods[testCase.method] = vi.fn(
+      async () =>
+        ({
+          ok: false,
+          error: { code: "FORBIDDEN", message: "required capability is secret" },
+        }) as never,
+    );
+    expect(await runRead(testCase, testCase.request, methods, async () => readActor)).toEqual({
+      ok: false,
+      error: { code: "FORBIDDEN" },
+    });
+  });
+
+  it.each(readCases)("$name contains invocation exceptions", async (testCase) => {
+    const methods = readMethodSpies();
+    methods[testCase.method] = vi.fn(async () => {
+      throw new Error("provider, persistence, and stack secret");
+    });
+    expect(await runRead(testCase, testCase.request, methods, async () => readActor)).toEqual({
+      ok: false,
+      error: { code: "INTERNAL_FAILURE" },
+    });
+  });
+
+  it("contains an invalid projected success before release", async () => {
+    const methods = readMethodSpies();
+    methods.getTaxonomy = vi.fn(
+      async () => ({ ok: true, value: [{ code: "", name: "", families: [] }] }) as never,
+    );
+    const result = await runRead(readCases[0] as ReadCase, {}, methods, async () => readActor);
+    expect(result).toEqual({ ok: false, error: { code: "INTERNAL_FAILURE" } });
+  });
+});
 
 type MutationMethod = "createResource" | "updateNonIdentityData" | "deactivateResource";
 type MutationInvocation = (rawRequest: unknown, dependencies: ReadDependencies) => Promise<unknown>;
