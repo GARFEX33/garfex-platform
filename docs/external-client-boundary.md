@@ -1,0 +1,74 @@
+# Independent external client boundary
+
+- **Status:** Accepted
+- **Date:** 2026-08-24
+- **Owner:** GARFEX backend
+
+`garfex-platform-ui` is an untrusted external client of GARFEX. It is not a workspace member,
+package consumer, source consumer, or deployment unit of this backend repository. The only valid
+cross-repository boundary is an explicitly public, external, client-facing contract established and
+owned by GARFEX.
+
+## Decision
+
+Shared contractual meaning does not require shared implementation. In particular, the Resource
+Master module public application contract at `resource-master/public.ts` is an in-process backend
+module boundary; it is **not** an external client-facing contract and cannot be imported by the UI.
+
+The backend and every external client remain independently installable, buildable, testable,
+runnable, and deployable. No client may require backend source, internal packages, schemas, generated
+bindings, or repository links for any of those activities. The backend likewise never depends on UI
+source, state, presentation, navigation, host concepts, or build output.
+
+A future artifact may cross the repository boundary only after a separate decision makes it all of
+the following:
+
+- explicitly public and client-facing;
+- versioned with compatibility ownership;
+- safe for an untrusted client; and
+- independent of backend source and internal packages.
+
+A future public SDK is a separate decision. The phrase “GARFEX client” describes a consumer role and
+does not imply an SDK, shared backend package, generated binding, schema package, or source link.
+
+## Trust and ownership consequences
+
+Authentication and authorization remain server-side responsibilities. The server constructs trusted
+`ActorContext`; external input cannot supply authoritative identity, provider claims, roles, or
+capabilities. Owning application modules continue to perform final authorization.
+
+Convex, persistence adapters, generated bindings, infrastructure, deployment representations, and
+module internals stay private to the backend. A future client-facing contract may express public
+meaning, but it must not expose or import those implementation details.
+
+The backend owns the public external boundary and its compatibility policy. This decision does not
+copy or redefine UI architecture; it constrains what the backend may publish or consume.
+
+## Repository topology
+
+Physical coupling is forbidden even when no import resolves. Neither repository may be included by
+package or Git dependency, workspace/project/filesystem link, submodule, or escaping symlink. The
+physical location of a future Pi implementation remains open, but it cannot be resolved by putting,
+copying, linking, or mounting Surface source into `garfex-platform` while this decision holds.
+
+## Open and out of scope
+
+This decision intentionally does not choose or implement:
+
+- transport or protocol representation;
+- a public SDK, package registry, contract generation, or generated bindings;
+- external schemas or their versioning mechanism;
+- Resource Search or any other domain behavior;
+- productive authentication changes; or
+- the physical repository location of Pi.
+
+These require explicit later decisions. None is implied by calling the UI a GARFEX client.
+
+## Relationship to other decisions
+
+The accepted [Surface/UI and Harness boundary](./surface-ui-harness-boundary.md) remains unchanged:
+Surface/UI and Harness are separate roles. This decision clarifies the independent external boundary
+between a Surface and this backend; it does not select a transport or Harness.
+
+The completed persistent Resource Catalog history is also unchanged. This decision neither revises
+that work nor exposes its installer, payloads, fixtures, persistence representation, or schemas.

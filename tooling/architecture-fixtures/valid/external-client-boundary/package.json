@@ -1,0 +1,12 @@
+{
+  "name": "external-client-boundary-valid",
+  "private": true,
+  "type": "module",
+  "description": "The garfex-platform-ui repository is discussed here only as ordinary prose.",
+  "dependencies": {
+    "vitest": "2.1.9"
+  },
+  "scripts": {
+    "verify": "echo backend-only"
+  }
+}

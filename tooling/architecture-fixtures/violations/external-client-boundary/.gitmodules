@@ -1,0 +1,3 @@
+[submodule "garfex-platform-ui"]
+  path = vendor/garfex-platform-ui
+  url = https://example.invalid/garfex-platform-ui.git
