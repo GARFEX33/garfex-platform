@@ -810,5 +810,202 @@ describe("external GARFEX client-facing contract", () => {
         expect(result.error).not.toBe(error);
       }
     });
+
+    it("rejects unknown, extra, and malformed failure shapes", () => {
+      const symbol = Symbol("platform-secret");
+      const symbolFailure = { ok: false, error: { code: "FORBIDDEN" } } as Record<
+        PropertyKey,
+        unknown
+      >;
+      symbolFailure[symbol] = "provider-secret";
+
+      const throwingFailures: unknown[] = [
+        {
+          get ok(): never {
+            throw new Error("stack-secret");
+          },
+        },
+        {
+          ok: false,
+          get error(): never {
+            throw new Error("provider-secret");
+          },
+        },
+        {
+          ok: false,
+          error: {
+            get code(): never {
+              throw new Error("internal-secret");
+            },
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            get fieldIssues(): never {
+              throw new Error("message-secret");
+            },
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [
+              {
+                get path(): never {
+                  throw new Error("authority-secret");
+                },
+                reason: "TYPE",
+              },
+            ],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "DUPLICATE",
+            get existingResourceId(): never {
+              throw new Error("persistence-secret");
+            },
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "CONFLICT",
+            get currentRevision(): never {
+              throw new Error("catalog-secret");
+            },
+          },
+        },
+      ];
+
+      const malformedFailures: unknown[] = [
+        null,
+        undefined,
+        [],
+        new Date(),
+        { ok: true, value: "not-a-failure" },
+        { ok: false },
+        { ok: false, error: null },
+        { ok: false, error: { code: "UNKNOWN" } },
+        { ok: false, error: { code: "FORBIDDEN", message: "secret" } },
+        { ok: false, error: { code: "FORBIDDEN", fieldIssues: [] } },
+        { ok: false, error: { code: "NOT_FOUND", details: "secret" } },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field", reason: "TYPE" }],
+            extra: true,
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "DUPLICATE",
+            existingResourceId: "resource-1",
+            currentRevision: 2,
+          },
+        },
+        {
+          ok: false,
+          error: { code: "CONFLICT", currentRevision: 2, existingResourceId: "resource-1" },
+        },
+        { ok: false, error: { code: "DUPLICATE", existingResourceId: "" } },
+        { ok: false, error: { code: "CONFLICT", currentRevision: -1 } },
+        { ok: false, error: { code: "CONFLICT", currentRevision: 1.5 } },
+        { ok: false, error: { code: "INVALID_ARGUMENT", fieldIssues: "not-an-array" } },
+        { ok: false, error: { code: "INVALID_ARGUMENT", fieldIssues: [null] } },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "", reason: "TYPE" }],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field\nsecret", reason: "TYPE" }],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field", reason: "UNKNOWN_REASON" }],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field", reason: "TYPE", value: "secret" }],
+          },
+        },
+        symbolFailure,
+        ...throwingFailures,
+      ];
+
+      for (const value of malformedFailures) {
+        expectInternalFailure(validateExternalFailure(value));
+      }
+    });
+
+    it("keeps serialized failures free of internal diagnostics", () => {
+      const secrets = [
+        "message-secret",
+        "stack-secret",
+        "provider-secret",
+        "authority-secret",
+        "platform-secret",
+        "internal-secret",
+      ];
+      const unsafeFailures: unknown[] = [
+        {
+          ok: false,
+          error: {
+            code: "FORBIDDEN",
+            message: secrets[0],
+            stack: secrets[1],
+            provider: secrets[2],
+            authority: secrets[3],
+            platform: secrets[4],
+            internal: secrets[5],
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "DUPLICATE",
+            existingResourceId: "resource-1",
+            details: secrets.join("|"),
+          },
+        },
+        {
+          ok: false,
+          error: {
+            code: "INVALID_ARGUMENT",
+            fieldIssues: [{ path: "field", reason: "TYPE", message: secrets[0] }],
+          },
+        },
+      ];
+
+      for (const value of unsafeFailures) {
+        const result = validateExternalFailure(value);
+        expectInternalFailure(result);
+        const serialized = JSON.stringify(result);
+        expect(serialized).not.toContain("secret");
+        expect(serialized).toBe('{"ok":false,"error":{"code":"INTERNAL_FAILURE"}}');
+      }
+
+      expect(JSON.stringify(validateExternalFailure(safeFailures[2]))).toBe(
+        '{"ok":false,"error":{"code":"INVALID_ARGUMENT","fieldIssues":[{"path":"resourceId","reason":"REQUIRED"}]}}',
+      );
+    });
   });
 });

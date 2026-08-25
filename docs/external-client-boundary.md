@@ -28,6 +28,14 @@ the following:
 - safe for an untrusted client; and
 - independent of backend source and internal packages.
 
+The concrete ten-operation semantic contract is canonical in
+[`external-garfex-boundary.md`](./external-garfex-boundary.md). Its dependency direction is:
+
+```text
+independent external business contract -> trusted server adapter -> Resource Master public contract
+                                                         -> final module authorization -> private infrastructure
+```
+
 A future public SDK is a separate decision. The phrase “GARFEX client” describes a consumer role and
 does not imply an SDK, shared backend package, generated binding, schema package, or source link.
 
@@ -58,11 +66,12 @@ This decision intentionally does not choose or implement:
 - transport or protocol representation;
 - a public SDK, package registry, contract generation, or generated bindings;
 - external schemas or their versioning mechanism;
-- Resource Search or any other domain behavior;
+- consumer-specific workflows or external operations beyond the canonical GARFEX contract;
 - productive authentication changes; or
 - the physical repository location of Pi.
 
-These require explicit later decisions. None is implied by calling the UI a GARFEX client.
+These require explicit later decisions. None is implied by calling the UI a GARFEX client, and the
+canonical semantic boundary creates no network reachability.
 
 ## Relationship to other decisions
 
