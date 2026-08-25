@@ -311,3 +311,339 @@ export function validateExternalDeactivateResourceRequest(
     }),
   );
 }
+
+const internalFailure = (): ExternalFailure => ({
+  ok: false,
+  error: { code: "INTERNAL_FAILURE" },
+});
+
+type OutputParser<T> = (value: unknown) => T | undefined;
+type ParsedField<T> = T extends OutputParser<infer Value> ? Value : never;
+
+function outputShape<const Fields extends Record<string, OutputParser<unknown>>>(
+  fields: Fields,
+): OutputParser<{ [Key in keyof Fields]: ParsedField<Fields[Key]> }> {
+  return (value) => {
+    if (!plainObject(value)) return undefined;
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== "string" || !Object.hasOwn(fields, key)) return undefined;
+    }
+    const result: Dictionary = {};
+    for (const key of Object.keys(fields)) {
+      const field = fields[key];
+      if (field === undefined || !Object.hasOwn(value, key)) return undefined;
+      const parsed = field(value[key]);
+      if (parsed === undefined) return undefined;
+      result[key] = parsed;
+    }
+    return result as { [Key in keyof Fields]: ParsedField<Fields[Key]> };
+  };
+}
+
+function outputArrayOf<T>(parse: OutputParser<T>): OutputParser<T[]> {
+  return (value) => {
+    if (!Array.isArray(value)) return undefined;
+    for (const key of Reflect.ownKeys(value)) {
+      if (
+        key !== "length" &&
+        (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length)
+      ) {
+        return undefined;
+      }
+    }
+    const result: T[] = [];
+    for (let index = 0; index < value.length; index += 1) {
+      if (!Object.hasOwn(value, index)) return undefined;
+      const parsed = parse(value[index]);
+      if (parsed === undefined) return undefined;
+      result.push(parsed);
+    }
+    return result;
+  };
+}
+
+const outputText: OutputParser<string> = (value) => (typeof value === "string" ? value : undefined);
+const outputBoolean: OutputParser<boolean> = (value) =>
+  typeof value === "boolean" ? value : undefined;
+const outputIdentifier: OutputParser<string> = (value) => {
+  if (typeof value !== "string" || value.length === 0 || controlCharacter(value)) return undefined;
+  return value;
+};
+
+function outputChoice<const Values extends readonly string[]>(
+  values: Values,
+): OutputParser<Values[number]> {
+  return (value) => {
+    if (typeof value !== "string") return undefined;
+    return values.includes(value as Values[number]) ? (value as Values[number]) : undefined;
+  };
+}
+
+function validateOutput<T>(parse: OutputParser<T>, value: unknown): ExternalValidationResult<T> {
+  try {
+    const result = parse(value);
+    return result === undefined ? internalFailure() : result;
+  } catch {
+    return internalFailure();
+  }
+}
+
+const codeName = outputShape({ code: outputIdentifier, name: outputText });
+const taxonomyFamily = outputShape({
+  code: outputIdentifier,
+  name: outputText,
+  types: outputArrayOf(codeName),
+});
+const taxonomyEntry = outputShape({
+  code: outputIdentifier,
+  name: outputText,
+  families: outputArrayOf(taxonomyFamily),
+});
+
+const schemaResult = outputShape({
+  mode: outputChoice(externalSchemaResultModes),
+  identity: outputBoolean,
+});
+const schemaRule = outputShape({
+  when: outputShape({ attributeCode: outputIdentifier, optionCode: outputIdentifier }),
+  result: schemaResult,
+});
+const schemaAttribute = outputShape({
+  code: outputIdentifier,
+  name: outputText,
+  kind: outputChoice(externalAttributeKinds),
+  meaning: outputText,
+  defaultResult: schemaResult,
+  rules: outputArrayOf(schemaRule),
+});
+
+const option = outputShape({ code: outputIdentifier, label: outputText });
+const outputQuantity: OutputParser<ExternalAttributeValue> = outputShape({
+  magnitude: outputIdentifier,
+  unitCode: outputIdentifier,
+});
+const outputAttributeValue: OutputParser<ExternalAttributeValue> = (value) => {
+  if (typeof value === "string" || typeof value === "boolean") return value;
+  return outputQuantity(value);
+};
+const outputResourceAttribute: OutputParser<ExternalSuccess<"getResource">["attributes"][number]> =
+  outputShape({
+    attributeCode: outputIdentifier,
+    value: outputAttributeValue,
+    displayValue: outputText,
+    identityParticipating: outputBoolean,
+  });
+const outputRevision: OutputParser<number> = (value) =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+const outputResource: OutputParser<ExternalSuccess<"getResource">> = outputShape({
+  resourceId: outputIdentifier,
+  classCode: outputIdentifier,
+  familyCode: outputIdentifier,
+  typeCode: outputIdentifier,
+  naturalUnitCode: outputIdentifier,
+  attributes: outputArrayOf(outputResourceAttribute),
+  canonicalIdentity: outputIdentifier,
+  identityPolicyVersion: outputChoice(["v1"] as const),
+  active: outputBoolean,
+  revision: outputRevision,
+});
+const outputSummary: OutputParser<ExternalSuccess<"searchResources">["items"][number]> =
+  outputShape({
+    resourceId: outputIdentifier,
+    classCode: outputIdentifier,
+    className: outputText,
+    familyCode: outputIdentifier,
+    familyName: outputText,
+    typeCode: outputIdentifier,
+    typeName: outputText,
+    naturalUnitCode: outputIdentifier,
+    description: outputText,
+    optionCodes: outputArrayOf(outputIdentifier),
+    optionLabels: outputArrayOf(outputText),
+    values: outputArrayOf(outputText),
+  });
+const outputCursor: OutputParser<string | null> = (value) =>
+  value === null ? null : outputIdentifier(value);
+const outputSearch: OutputParser<ExternalSuccess<"searchResources">> = outputShape({
+  items: outputArrayOf(outputSummary),
+  cursor: outputCursor,
+});
+const outputDescription: OutputParser<ExternalSuccess<"describeResource">> = outputShape({
+  resourceId: outputIdentifier,
+  description: outputText,
+});
+
+export function validateExternalGetTaxonomySuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getTaxonomy">> {
+  return validateOutput(outputArrayOf(taxonomyEntry), value);
+}
+
+export function validateExternalGetEffectiveResourceSchemaSuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getEffectiveResourceSchema">> {
+  return validateOutput(outputShape({ attributes: outputArrayOf(schemaAttribute) }), value);
+}
+
+export function validateExternalGetValidOptionsSuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getValidOptions">> {
+  return validateOutput(outputArrayOf(option), value);
+}
+
+export function validateExternalGetNaturalUnitsSuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getNaturalUnits">> {
+  return validateOutput(
+    outputShape({ allowed: outputArrayOf(codeName), suggested: codeName }),
+    value,
+  );
+}
+
+export function validateExternalGetResourceSuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getResource">> {
+  return validateOutput(outputResource, value);
+}
+
+export function validateExternalSearchResourcesSuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"searchResources">> {
+  return validateOutput(outputSearch, value);
+}
+
+export function validateExternalDescribeResourceSuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"describeResource">> {
+  return validateOutput(outputDescription, value);
+}
+
+export function validateExternalCreateResourceSuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"createResource">> {
+  return validateOutput(outputResource, value);
+}
+
+export function validateExternalUpdateNonIdentityDataSuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"updateNonIdentityData">> {
+  return validateOutput(outputResource, value);
+}
+
+export function validateExternalDeactivateResourceSuccess(
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"deactivateResource">> {
+  return validateOutput(outputResource, value);
+}
+
+type ParsedOptional<T> =
+  | { readonly present: false }
+  | { readonly present: true; readonly value: T };
+
+function closedFailureObject(
+  value: unknown,
+  allowedKeys: readonly string[],
+): Dictionary | undefined {
+  if (!plainObject(value)) return undefined;
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== "string" || !allowedKeys.includes(key)) return undefined;
+  }
+  return value;
+}
+
+function parseOptionalFailureField<T>(
+  record: Dictionary,
+  key: string,
+  parse: OutputParser<T>,
+): ParsedOptional<T> | undefined {
+  if (!Object.hasOwn(record, key)) return { present: false };
+  const parsed = parse(record[key]);
+  return parsed === undefined ? undefined : { present: true, value: parsed };
+}
+
+const failureFieldIssue: OutputParser<ExternalFieldIssue> = outputShape({
+  path: outputIdentifier,
+  reason: outputChoice(externalFieldIssueReasons),
+});
+const failureFieldIssues: OutputParser<readonly ExternalFieldIssue[]> =
+  outputArrayOf(failureFieldIssue);
+
+function parseFieldIssueError(
+  record: Dictionary,
+  code: "INVALID_ARGUMENT" | "INVALID_REFERENCE" | "VALIDATION_FAILED",
+): ExternalError | undefined {
+  const closed = closedFailureObject(record, ["code", "fieldIssues"]);
+  if (closed === undefined) return undefined;
+  const fieldIssues = parseOptionalFailureField(closed, "fieldIssues", failureFieldIssues);
+  if (fieldIssues === undefined) return undefined;
+  return fieldIssues.present ? { code, fieldIssues: fieldIssues.value } : { code };
+}
+
+function parseDuplicateError(record: Dictionary): ExternalError | undefined {
+  const closed = closedFailureObject(record, ["code", "existingResourceId"]);
+  if (closed === undefined) return undefined;
+  const existingResourceId = parseOptionalFailureField(
+    closed,
+    "existingResourceId",
+    outputIdentifier,
+  );
+  if (existingResourceId === undefined) return undefined;
+  return existingResourceId.present
+    ? { code: "DUPLICATE", existingResourceId: existingResourceId.value }
+    : { code: "DUPLICATE" };
+}
+
+function parseConflictError(record: Dictionary): ExternalError | undefined {
+  const closed = closedFailureObject(record, ["code", "currentRevision"]);
+  if (closed === undefined) return undefined;
+  const currentRevision = parseOptionalFailureField(closed, "currentRevision", outputRevision);
+  if (currentRevision === undefined) return undefined;
+  return currentRevision.present
+    ? { code: "CONFLICT", currentRevision: currentRevision.value }
+    : { code: "CONFLICT" };
+}
+
+function parseExternalError(value: unknown): ExternalError | undefined {
+  const record = closedFailureObject(value, [
+    "code",
+    "fieldIssues",
+    "existingResourceId",
+    "currentRevision",
+  ]);
+  if (record === undefined) return undefined;
+  const code = outputChoice(externalErrorCodes)(record.code);
+  if (code === undefined) return undefined;
+
+  switch (code) {
+    case "INVALID_ARGUMENT":
+    case "INVALID_REFERENCE":
+    case "VALIDATION_FAILED":
+      return parseFieldIssueError(record, code);
+    case "DUPLICATE":
+      return parseDuplicateError(record);
+    case "CONFLICT":
+      return parseConflictError(record);
+    case "UNAUTHENTICATED":
+    case "FORBIDDEN":
+    case "NOT_FOUND":
+    case "INVALID_LIFECYCLE":
+    case "CATALOG_UNAVAILABLE":
+    case "INTERNAL_FAILURE": {
+      const closed = closedFailureObject(record, ["code"]);
+      return closed === undefined ? undefined : { code };
+    }
+  }
+}
+
+export function validateExternalFailure(value: unknown): ExternalFailure {
+  try {
+    const record = closedFailureObject(value, ["ok", "error"]);
+    if (record === undefined || record.ok !== false || !Object.hasOwn(record, "error")) {
+      return internalFailure();
+    }
+    const error = parseExternalError(record.error);
+    return error === undefined ? internalFailure() : { ok: false, error };
+  } catch {
+    return internalFailure();
+  }
+}
