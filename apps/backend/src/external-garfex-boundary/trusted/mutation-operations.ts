@@ -1,9 +1,12 @@
 import type { ActorContext, ResourceMaster, Result } from "../../resource-master/public.js";
 import type {
   ExternalAttributeValue,
+  ExternalCreateResourceRequest,
+  ExternalDeactivateResourceRequest,
   ExternalFailure,
   ExternalOperation,
   ExternalOutcome,
+  ExternalUpdateNonIdentityDataRequest,
 } from "../client-facing/contract.js";
 import {
   validateExternalCreateResourceRequest,
@@ -15,9 +18,9 @@ import {
   validateExternalUpdateNonIdentityDataSuccess,
 } from "../client-facing/validation.js";
 import {
+  type ExternalBoundaryDiagnostics,
   normalizeResourceError,
   normalizeThrownError,
-  type ExternalBoundaryDiagnostics,
 } from "./errors.js";
 import type { TrustedActorResolver } from "./identity.js";
 import {
@@ -103,6 +106,89 @@ function rebuildAttributes(
     rebuilt[code] = rebuildAttributeValue(value);
   }
   return rebuilt;
+}
+
+export async function handleCreateResource(
+  request: ExternalCreateResourceRequest,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ExternalOutcome<"createResource">> {
+  const input: Parameters<ResourceMaster["createResource"]>[1] = {
+    classCode: request.classCode,
+    familyCode: request.familyCode,
+    typeCode: request.typeCode,
+    naturalUnitCode: request.naturalUnitCode,
+    attributes: rebuildAttributes(request.attributes),
+  };
+  let result: Awaited<ReturnType<ResourceMaster["createResource"]>>;
+  try {
+    result = await resourceMaster.createResource(actor, input);
+  } catch (cause) {
+    return checkedFailure(normalizeThrownError("createResource", "invocation", cause, diagnostics));
+  }
+  return completeMutationOutcome(
+    "createResource",
+    result,
+    projectExternalCreateResource,
+    validateExternalCreateResourceSuccess,
+    diagnostics,
+  );
+}
+
+export async function handleUpdateNonIdentityData(
+  request: ExternalUpdateNonIdentityDataRequest,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ExternalOutcome<"updateNonIdentityData">> {
+  const input: Parameters<ResourceMaster["updateNonIdentityData"]>[1] = {
+    resourceId: request.resourceId,
+    expectedRevision: request.expectedRevision,
+    naturalUnitCode: request.naturalUnitCode,
+  };
+  let result: Awaited<ReturnType<ResourceMaster["updateNonIdentityData"]>>;
+  try {
+    result = await resourceMaster.updateNonIdentityData(actor, input);
+  } catch (cause) {
+    return checkedFailure(
+      normalizeThrownError("updateNonIdentityData", "invocation", cause, diagnostics),
+    );
+  }
+  return completeMutationOutcome(
+    "updateNonIdentityData",
+    result,
+    projectExternalUpdateNonIdentityData,
+    validateExternalUpdateNonIdentityDataSuccess,
+    diagnostics,
+  );
+}
+
+export async function handleDeactivateResource(
+  request: ExternalDeactivateResourceRequest,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ExternalOutcome<"deactivateResource">> {
+  const input: Parameters<ResourceMaster["deactivateResource"]>[1] = {
+    resourceId: request.resourceId,
+    expectedRevision: request.expectedRevision,
+  };
+  let result: Awaited<ReturnType<ResourceMaster["deactivateResource"]>>;
+  try {
+    result = await resourceMaster.deactivateResource(actor, input);
+  } catch (cause) {
+    return checkedFailure(
+      normalizeThrownError("deactivateResource", "invocation", cause, diagnostics),
+    );
+  }
+  return completeMutationOutcome(
+    "deactivateResource",
+    result,
+    projectExternalDeactivateResource,
+    validateExternalDeactivateResourceSuccess,
+    diagnostics,
+  );
 }
 
 export async function invokeExternalCreateResource(

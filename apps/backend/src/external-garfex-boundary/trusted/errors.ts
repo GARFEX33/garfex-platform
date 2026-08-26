@@ -1,4 +1,9 @@
-import type { ExternalFailure, ExternalOperation } from "../client-facing/contract.js";
+import type {
+  ExternalErrorCode,
+  ExternalFailure,
+  ExternalOperation,
+} from "../client-facing/contract.js";
+import { validateExternalFailure } from "../client-facing/validation.js";
 import type { ResourceError, ResourceErrorCode } from "../../resource-master/public.js";
 
 export type ExternalBoundaryDiagnosticPhase =
@@ -20,19 +25,19 @@ const internalFailure = (): ExternalFailure => ({
   error: { code: "INTERNAL_FAILURE" },
 });
 
-function validExternalIdentifier(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    value.length > 0 &&
-    ![...value].some((character) => {
-      const code = character.charCodeAt(0);
-      return code < 32 || code === 127;
-    })
-  );
-}
+type FailureRecord = Record<string, unknown>;
 
-function validRevision(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+/** The generated validator is the only external error membership/shape authority. */
+function validatedFailure(
+  code: ExternalErrorCode,
+  source: FailureRecord,
+  metadata: readonly string[],
+): ExternalFailure {
+  const error: FailureRecord = { code };
+  for (const name of metadata) {
+    if (Object.hasOwn(source, name)) error[name] = source[name];
+  }
+  return validateExternalFailure({ ok: false, error });
 }
 
 function resourceErrorCode(value: unknown): ResourceErrorCode | undefined {
@@ -70,11 +75,11 @@ function resourceErrorCode(value: unknown): ResourceErrorCode | undefined {
   }
 }
 
-function plainRecord(value: unknown): Record<string, unknown> | undefined {
+function plainRecord(value: unknown): FailureRecord | undefined {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null
-    ? (value as Record<string, unknown>)
+    ? (value as FailureRecord)
     : undefined;
 }
 
@@ -89,40 +94,26 @@ export function normalizeResourceError(error: unknown): ExternalFailure {
 
     switch (code) {
       case "UNAUTHENTICATED":
-        return { ok: false, error: { code: "UNAUTHENTICATED" } };
+        return validatedFailure("UNAUTHENTICATED", record, []);
       case "FORBIDDEN":
-        return { ok: false, error: { code: "FORBIDDEN" } };
+        return validatedFailure("FORBIDDEN", record, []);
       case "INVALID_ARGUMENT":
-        return { ok: false, error: { code: "INVALID_ARGUMENT" } };
+        return validatedFailure("INVALID_ARGUMENT", record, ["fieldIssues"]);
       case "INVALID_REFERENCE":
-        return { ok: false, error: { code: "INVALID_REFERENCE" } };
+        return validatedFailure("INVALID_REFERENCE", record, ["fieldIssues"]);
       case "VALIDATION":
-        return { ok: false, error: { code: "VALIDATION_FAILED" } };
+        return validatedFailure("VALIDATION_FAILED", record, ["fieldIssues"]);
       case "NOT_FOUND":
-        return { ok: false, error: { code: "NOT_FOUND" } };
-      case "DUPLICATE": {
-        if (!Object.hasOwn(record, "existingResourceId")) {
-          return { ok: false, error: { code: "DUPLICATE" } };
-        }
-        const existingResourceId = record.existingResourceId;
-        return validExternalIdentifier(existingResourceId)
-          ? { ok: false, error: { code: "DUPLICATE", existingResourceId } }
-          : internalFailure();
-      }
-      case "CONFLICT": {
-        if (!Object.hasOwn(record, "currentRevision")) {
-          return { ok: false, error: { code: "CONFLICT" } };
-        }
-        const currentRevision = record.currentRevision;
-        return validRevision(currentRevision)
-          ? { ok: false, error: { code: "CONFLICT", currentRevision } }
-          : internalFailure();
-      }
+        return validatedFailure("NOT_FOUND", record, []);
+      case "DUPLICATE":
+        return validatedFailure("DUPLICATE", record, ["existingResourceId"]);
+      case "CONFLICT":
+        return validatedFailure("CONFLICT", record, ["currentRevision"]);
       case "INVALID_LIFECYCLE":
-        return { ok: false, error: { code: "INVALID_LIFECYCLE" } };
+        return validatedFailure("INVALID_LIFECYCLE", record, []);
       case "RESOURCE_CATALOG_UNAVAILABLE":
       case "RESOURCE_CATALOG_UNINITIALIZED":
-        return { ok: false, error: { code: "CATALOG_UNAVAILABLE" } };
+        return validatedFailure("CATALOG_UNAVAILABLE", record, []);
       case "INTEGRITY":
       case "INTERNAL":
       case "RESOURCE_CATALOG_INVALID":
@@ -150,6 +141,6 @@ export function normalizeThrownError(
   }
 
   return phase === "authentication"
-    ? { ok: false, error: { code: "UNAUTHENTICATED" } }
+    ? validatedFailure("UNAUTHENTICATED", {}, [])
     : internalFailure();
 }

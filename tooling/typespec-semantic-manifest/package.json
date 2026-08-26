@@ -1,0 +1,22 @@
+{
+  "name": "@garfex/typespec-semantic-manifest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "contract:typespec:check": "cd ../../contracts/external-garfex/resource-master && corepack pnpm exec tsp compile . --no-emit",
+    "contract:generate": "cd ../../ && corepack pnpm contract:generate",
+    "contract:check": "cd ../../ && corepack pnpm contract:check"
+  },
+  "tspMain": "./lib/main.tsp",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "peerDependencies": {
+    "@typespec/compiler": "1.15.0"
+  }
+}

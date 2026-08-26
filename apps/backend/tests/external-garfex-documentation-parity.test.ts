@@ -1,13 +1,22 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  type ExternalErrorCode,
   externalErrorCodes,
   externalOperationIdentifiers,
-  type ExternalErrorCode,
 } from "../src/external-garfex-boundary/client-facing/contract.js";
 import { resourceMasterOperationCapabilities } from "../src/resource-master/application/authorization.js";
 
 const documentationUrl = new URL("../../../docs/external-garfex-boundary.md", import.meta.url);
+const canonicalUrls = {
+  externalClient: new URL("../../../docs/external-client-boundary.md", import.meta.url),
+  auth: new URL("../../../docs/auth-boundary.md", import.meta.url),
+  architecture: new URL("../../../docs/architecture.md", import.meta.url),
+  generated: new URL(
+    "../../../docs/generated/resource-master-external-contract.md",
+    import.meta.url,
+  ),
+} as const;
 const fixtureUrl = new URL(
   "./fixtures/external-garfex-boundary/compatibility.json",
   import.meta.url,
@@ -79,6 +88,10 @@ function fixture(): Record<string, unknown> {
   return record(JSON.parse(readFileSync(fixtureUrl, "utf8")) as unknown);
 }
 
+function canonicalDocument(name: keyof typeof canonicalUrls): string {
+  return readFileSync(canonicalUrls[name], "utf8");
+}
+
 describe("external GARFEX documentation parity", () => {
   it("matches executable operations, mappings, fixture entries, and error metadata", () => {
     const source = documentation();
@@ -122,5 +135,42 @@ describe("external GARFEX documentation parity", () => {
       "productive-idp-session",
       "consumer-behavior",
     ]);
+  });
+
+  it("cross-links the three boundaries, generated semantics, and acceptance evidence", () => {
+    const boundary = documentation();
+    expect(boundary).toContain("contracts/external-garfex/resource-master/");
+    expect(boundary).toContain("generated/resource-master-external-contract.md");
+    expect(boundary).toContain("accepted-semantic-manifest.json");
+    expect(boundary).toContain("stale-artifact");
+    expect(boundary).toContain("breaking-change");
+    expect(boundary).toContain("TypeSpec");
+    expect(boundary).toContain("fresh `ActorContext`");
+    expect(boundary).toContain("final deny-by-default capability");
+    expect(boundary).toContain("Convex remains a private");
+
+    const canonicalRecords = (["externalClient", "auth", "architecture"] as const).map(
+      canonicalDocument,
+    );
+    const linkedRecords = canonicalRecords.join("\n");
+    for (const record of canonicalRecords) {
+      expect(record).toContain("external-garfex-boundary.md");
+      expect(record).toContain("contracts/external-garfex/resource-master/");
+      expect(record).toContain("semantic-manifest.json");
+      expect(record).toContain("accepted-semantic-manifest.json");
+      expect(record).toContain("resource-master-external-contract.md");
+      expect(record).toContain("opaque");
+      expect(record).toContain("transport");
+      expect(record).toContain("Convex");
+    }
+    for (const recordName of ["external-client-boundary.md", "auth-boundary.md", "architecture.md"])
+      expect(linkedRecords).toContain(recordName);
+
+    const generated = canonicalDocument("generated");
+    expect(generated).toContain("Compatibility revision: `1`");
+    expect(generated).toContain("opaque string");
+    expect(generated).not.toMatch(
+      /ActorContext|capabilit(?:y|ies)|Convex|persistence|HTTP|route|header/i,
+    );
   });
 });

@@ -1,4 +1,5 @@
 {
+  "evidenceKind": "semantic-compatibility",
   "operations": {
     "getTaxonomy": {
       "request": {},

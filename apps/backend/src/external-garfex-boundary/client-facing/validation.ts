@@ -1,648 +1,905 @@
-import {
-  externalAttributeKinds,
-  externalErrorCodes,
-  externalFieldIssueReasons,
-  externalOperationIdentifiers,
-  externalResourceLifecycles,
-  externalSchemaResultModes,
-} from "./contract.js";
 import type {
-  ExternalAttributeValue,
   ExternalError,
+  ExternalErrorCode,
   ExternalFailure,
-  ExternalFieldIssue,
   ExternalFieldIssueReason,
   ExternalOperation,
   ExternalRequest,
   ExternalSuccess,
 } from "./contract.js";
+import { semanticManifest } from "./generated/semantic-contract.generated.js";
 
+// The interpreter consumes only the generated manifest algebra. These types model
+// its recursive data shape; they do not describe any business field or enum.
+type RuntimeType =
+  | { readonly kind: "array"; readonly element: RuntimeType }
+  | { readonly kind: "literal"; readonly value: boolean | null | number | string }
+  | { readonly kind: "object"; readonly properties: readonly RuntimeProperty[] }
+  | { readonly kind: "named"; readonly name: string }
+  | { readonly kind: "nullable"; readonly type: RuntimeType }
+  | { readonly kind: "record"; readonly value: RuntimeType }
+  | { readonly kind: "scalar"; readonly name: string };
+
+type RuntimeProperty = {
+  readonly name: string;
+  readonly optional: boolean;
+  readonly type: RuntimeType;
+};
+
+type RuntimeModel = {
+  readonly name: string;
+  readonly properties: readonly RuntimeProperty[];
+  readonly indexer?: { readonly value: RuntimeType } | null;
+};
+
+type RuntimeEnum = {
+  readonly name: string;
+  readonly values: readonly (string | number)[];
+};
+
+type RuntimeUnion = {
+  readonly name: string;
+  readonly variants: readonly { readonly name: string; readonly type: RuntimeType }[];
+};
+
+type RuntimeScalar = {
+  readonly base: string;
+  readonly constraints: {
+    readonly maxItems?: number;
+    readonly maxLength?: number;
+    readonly maxValue?: number;
+    readonly minItems?: number;
+    readonly minLength?: number;
+    readonly minValue?: number;
+    readonly pattern?: string;
+  };
+  readonly name: string;
+};
+
+type ParseSuccess = { readonly success: true; readonly value: unknown };
+type GeneratedFieldIssueReason = Exclude<
+  ExternalFieldIssueReason,
+  "TYPE" | "UNKNOWN_FIELD" | "INVALID_VALUE"
+>;
+type ParseFailure = {
+  readonly success: false;
+  readonly path: string;
+  readonly reason: GeneratedFieldIssueReason;
+  readonly legacyReason: ExternalFieldIssueReason;
+};
+type ParseResult = ParseSuccess | ParseFailure;
 type Dictionary = Record<string, unknown>;
 export type ExternalValidationResult<T> = T | ExternalFailure;
 
-function plainObject(value: unknown): value is Dictionary {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  return [Object.prototype, null].includes(Object.getPrototypeOf(value));
+const legacyReasonFor = (reason: GeneratedFieldIssueReason): ExternalFieldIssueReason => {
+  switch (reason) {
+    case "INVALID_FORMAT":
+      return "TYPE";
+    case "UNSUPPORTED":
+      return "INVALID_VALUE";
+    default:
+      return reason;
+  }
+};
+
+const legacyFieldIssueReason = (
+  value: unknown,
+): value is Extract<ExternalFieldIssueReason, "TYPE" | "UNKNOWN_FIELD" | "INVALID_VALUE"> =>
+  value === "TYPE" || value === "UNKNOWN_FIELD" || value === "INVALID_VALUE";
+
+const generatedStringValues = (name: string): readonly string[] | undefined => {
+  const definition = semanticManifest.enums.find((candidate) => candidate.name === name);
+  if (definition === undefined) return undefined;
+  const values: string[] = [];
+  for (const value of definition.values) {
+    if (typeof value !== "string") return undefined;
+    values.push(value);
+  }
+  return values;
+};
+
+const generatedValue = (enumName: string, value: string): string | undefined => {
+  const values = generatedStringValues(enumName);
+  return values?.find((candidate) => candidate === value);
+};
+
+const externalErrorCode = (value: unknown): value is ExternalErrorCode =>
+  typeof value === "string" && generatedValue("ExternalFailureCode", value) !== undefined;
+
+const externalFieldIssueReason = (value: unknown): value is GeneratedFieldIssueReason =>
+  typeof value === "string" && generatedValue("FieldIssueReason", value) !== undefined;
+
+const generatedErrorCode = (name: string): ExternalErrorCode => {
+  if (externalErrorCode(name)) return name;
+  throw new Error(`generated external error code is missing: ${name}`);
+};
+
+const generatedReason = (name: string): GeneratedFieldIssueReason => {
+  if (externalFieldIssueReason(name)) return name;
+  throw new Error(`generated field-issue reason is missing: ${name}`);
+};
+
+const invalidArgumentCode = (): ExternalErrorCode => generatedErrorCode("INVALID_ARGUMENT");
+const internalFailureCode = (): ExternalErrorCode => generatedErrorCode("INTERNAL_FAILURE");
+
+function parseFailure(
+  path: string,
+  reason: GeneratedFieldIssueReason,
+  legacyReason: ExternalFieldIssueReason = legacyReasonFor(reason),
+): ParseFailure {
+  return { success: false, path, reason, legacyReason };
 }
 
 function invalid(path: string, reason: ExternalFieldIssueReason): ExternalFailure {
-  return { ok: false, error: { code: "INVALID_ARGUMENT", fieldIssues: [{ path, reason }] } };
-}
-
-function failed(value: unknown): value is ExternalFailure {
-  return plainObject(value) && value.ok === false && plainObject(value.error);
-}
-
-function safe<T>(validate: () => ExternalValidationResult<T>): ExternalValidationResult<T> {
-  try {
-    return validate();
-  } catch {
-    return invalid("$", "INVALID_VALUE");
-  }
-}
-
-function closed(
-  value: unknown,
-  allowed: readonly string[],
-  path = "$",
-): Dictionary | ExternalFailure {
-  if (!plainObject(value)) return invalid(path, "TYPE");
-  for (const key of Reflect.ownKeys(value)) {
-    if (typeof key !== "string" || !allowed.includes(key)) {
-      return invalid(path === "$" && typeof key === "string" ? key : path, "UNKNOWN_FIELD");
-    }
-  }
-  return value;
-}
-
-function text(record: Dictionary, key: string, path = key): string | ExternalFailure {
-  if (!Object.hasOwn(record, key)) return invalid(path, "REQUIRED");
-  const value = record[key];
-  return typeof value === "string" && value.length > 0 ? value : invalid(path, "TYPE");
-}
-
-function integer(
-  record: Dictionary,
-  key: string,
-  minimum: number,
-  maximum: number,
-): number | ExternalFailure {
-  if (!Object.hasOwn(record, key)) return invalid(key, "REQUIRED");
-  const value = record[key];
-  return typeof value === "number" &&
-    Number.isSafeInteger(value) &&
-    value >= minimum &&
-    value <= maximum
-    ? value
-    : invalid(key, "OUT_OF_RANGE");
-}
-
-function choice<const Values extends readonly string[]>(
-  record: Dictionary,
-  key: string,
-  values: Values,
-): Values[number] | ExternalFailure {
-  const value = text(record, key);
-  return failed(value)
-    ? value
-    : values.includes(value as Values[number])
-      ? value
-      : invalid(key, "INVALID_VALUE");
-}
-
-function textFields(
-  record: Dictionary,
-  keys: readonly string[],
-): Record<string, string> | ExternalFailure {
-  const result: Record<string, string> = {};
-  for (const key of keys) {
-    const value = text(record, key);
-    if (failed(value)) return value;
-    result[key] = value;
-  }
-  return result;
-}
-
-function field(fields: Record<string, string>, key: string): string {
-  const value = fields[key];
-  if (value === undefined) throw new Error(`validated field is missing: ${key}`);
-  return value;
-}
-
-function textValidator<T>(
-  keys: readonly string[],
-  build: (fields: Record<string, string>) => T,
-): (value: unknown) => ExternalValidationResult<T> {
-  return (value) =>
-    safe(() => {
-      const record = closed(value, keys);
-      if (failed(record)) return record;
-      const fields = textFields(record, keys);
-      return failed(fields) ? fields : build(fields);
-    });
-}
-
-const controlCharacter = (value: string): boolean =>
-  [...value].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127);
-
-const reservedAttributePattern =
-  /^(?:__proto__|constructor|prototype|actor|role|capabilit|claim|token|credential|session|provider|auth|authorit|identity|resourceid|convex|document|database|repository|persist|deploy|catalog)/;
-
-function attribute(value: unknown, path: string): ExternalAttributeValue | ExternalFailure {
-  if (typeof value === "string" || typeof value === "boolean") return value;
-  const quantity = closed(value, ["magnitude", "unitCode"], path);
-  if (failed(quantity)) return quantity;
-  const magnitude = text(quantity, "magnitude", `${path}.magnitude`);
-  if (failed(magnitude)) return magnitude;
-  const unitCode = text(quantity, "unitCode", `${path}.unitCode`);
-  return failed(unitCode) ? unitCode : { magnitude, unitCode };
-}
-
-function attributes(
-  value: unknown,
-  path: string,
-): Record<string, ExternalAttributeValue> | ExternalFailure {
-  if (!plainObject(value)) return invalid(path, "TYPE");
-  const result: Record<string, ExternalAttributeValue> = {};
-  for (const key of Reflect.ownKeys(value)) {
-    const normalized = typeof key === "string" ? key.replace(/[_.-]/g, "").toLowerCase() : "";
-    if (typeof key !== "string" || reservedAttributePattern.test(normalized)) {
-      return invalid(`${path}.${typeof key === "string" ? key : "*"}`, "UNKNOWN_FIELD");
-    }
-    const item = attribute(value[key], `${path}.${key}`);
-    if (failed(item)) return item;
-    result[key] = item;
-  }
-  return result;
-}
-
-export function parseExternalOperationIdentifier(
-  value: unknown,
-): ExternalOperation | ExternalFailure {
-  const operation =
-    typeof value === "string"
-      ? externalOperationIdentifiers.find((candidate) => candidate === value)
-      : undefined;
-  return operation ?? invalid("operation", typeof value === "string" ? "INVALID_VALUE" : "TYPE");
-}
-
-export function validateExternalGetTaxonomyRequest(
-  value: unknown,
-): ExternalValidationResult<ExternalRequest<"getTaxonomy">> {
-  return safe(() => {
-    const record = closed(value, []);
-    return failed(record) ? record : {};
-  });
-}
-
-export const validateExternalGetEffectiveResourceSchemaRequest = textValidator(
-  ["classCode", "familyCode", "typeCode"],
-  (fields) => ({
-    classCode: field(fields, "classCode"),
-    familyCode: field(fields, "familyCode"),
-    typeCode: field(fields, "typeCode"),
-  }),
-);
-
-export const validateExternalGetValidOptionsRequest = textValidator(
-  ["attributeCode"],
-  (fields) => ({ attributeCode: field(fields, "attributeCode") }),
-);
-
-export const validateExternalGetNaturalUnitsRequest = textValidator(["familyCode"], (fields) => ({
-  familyCode: field(fields, "familyCode"),
-}));
-
-export const validateExternalGetResourceRequest = textValidator(["resourceId"], (fields) => ({
-  resourceId: field(fields, "resourceId"),
-}));
-
-export function validateExternalSearchResourcesRequest(
-  value: unknown,
-): ExternalValidationResult<ExternalRequest<"searchResources">> {
-  return safe(() => {
-    const record = closed(value, ["terms", "lifecycle", "limit", "cursor"]);
-    if (failed(record)) return record;
-    const terms = text(record, "terms");
-    if (failed(terms)) return terms;
-
-    const result: ExternalRequest<"searchResources"> & {
-      lifecycle?: (typeof externalResourceLifecycles)[number];
-      limit?: number;
-      cursor?: string | null;
-    } = { terms };
-    if (Object.hasOwn(record, "lifecycle")) {
-      const lifecycle = choice(record, "lifecycle", externalResourceLifecycles);
-      if (failed(lifecycle)) return lifecycle;
-      result.lifecycle = lifecycle;
-    }
-    if (Object.hasOwn(record, "limit")) {
-      const limit = integer(record, "limit", 1, 50);
-      if (failed(limit)) return limit;
-      result.limit = limit;
-    }
-    if (Object.hasOwn(record, "cursor")) {
-      const cursor = record.cursor;
-      if (cursor !== null && typeof cursor !== "string") return invalid("cursor", "TYPE");
-      if (typeof cursor === "string" && (cursor.length === 0 || controlCharacter(cursor))) {
-        return invalid("cursor", "INVALID_VALUE");
-      }
-      result.cursor = cursor;
-    }
-    return result;
-  });
-}
-
-export const validateExternalDescribeResourceRequest = textValidator(["resourceId"], (fields) => ({
-  resourceId: field(fields, "resourceId"),
-}));
-
-export function validateExternalCreateResourceRequest(
-  value: unknown,
-): ExternalValidationResult<ExternalRequest<"createResource">> {
-  return safe(() => {
-    const record = closed(value, [
-      "classCode",
-      "familyCode",
-      "typeCode",
-      "naturalUnitCode",
-      "attributes",
-    ]);
-    if (failed(record)) return record;
-    const fields = textFields(record, ["classCode", "familyCode", "typeCode", "naturalUnitCode"]);
-    if (failed(fields)) return fields;
-    const values = attributes(record.attributes, "attributes");
-    if (failed(values)) return values;
-    return {
-      classCode: field(fields, "classCode"),
-      familyCode: field(fields, "familyCode"),
-      typeCode: field(fields, "typeCode"),
-      naturalUnitCode: field(fields, "naturalUnitCode"),
-      attributes: values,
-    };
-  });
-}
-
-function revisionRequest<T>(
-  value: unknown,
-  keys: readonly string[],
-  build: (
-    resourceId: string,
-    expectedRevision: number,
-    record: Dictionary,
-  ) => ExternalValidationResult<T>,
-): ExternalValidationResult<T> {
-  return safe(() => {
-    const record = closed(value, keys);
-    if (failed(record)) return record;
-    const resourceId = text(record, "resourceId");
-    if (failed(resourceId)) return resourceId;
-    const expectedRevision = integer(record, "expectedRevision", 0, Number.MAX_SAFE_INTEGER);
-    return failed(expectedRevision)
-      ? expectedRevision
-      : build(resourceId, expectedRevision, record);
-  });
-}
-
-export function validateExternalUpdateNonIdentityDataRequest(
-  value: unknown,
-): ExternalValidationResult<ExternalRequest<"updateNonIdentityData">> {
-  return revisionRequest(
-    value,
-    ["resourceId", "expectedRevision", "naturalUnitCode"],
-    (resourceId, expectedRevision, record) => {
-      const naturalUnitCode = text(record, "naturalUnitCode");
-      return failed(naturalUnitCode)
-        ? naturalUnitCode
-        : { resourceId, expectedRevision, naturalUnitCode };
+  return {
+    ok: false,
+    error: {
+      code: invalidArgumentCode(),
+      fieldIssues: [{ path, reason }],
     },
-  );
-}
-
-export function validateExternalDeactivateResourceRequest(
-  value: unknown,
-): ExternalValidationResult<ExternalRequest<"deactivateResource">> {
-  return revisionRequest(
-    value,
-    ["resourceId", "expectedRevision"],
-    (resourceId, expectedRevision) => ({
-      resourceId,
-      expectedRevision,
-    }),
-  );
-}
-
-const internalFailure = (): ExternalFailure => ({
-  ok: false,
-  error: { code: "INTERNAL_FAILURE" },
-});
-
-type OutputParser<T> = (value: unknown) => T | undefined;
-type ParsedField<T> = T extends OutputParser<infer Value> ? Value : never;
-
-function outputShape<const Fields extends Record<string, OutputParser<unknown>>>(
-  fields: Fields,
-): OutputParser<{ [Key in keyof Fields]: ParsedField<Fields[Key]> }> {
-  return (value) => {
-    if (!plainObject(value)) return undefined;
-    for (const key of Reflect.ownKeys(value)) {
-      if (typeof key !== "string" || !Object.hasOwn(fields, key)) return undefined;
-    }
-    const result: Dictionary = {};
-    for (const key of Object.keys(fields)) {
-      const field = fields[key];
-      if (field === undefined || !Object.hasOwn(value, key)) return undefined;
-      const parsed = field(value[key]);
-      if (parsed === undefined) return undefined;
-      result[key] = parsed;
-    }
-    return result as { [Key in keyof Fields]: ParsedField<Fields[Key]> };
   };
 }
 
-function outputArrayOf<T>(parse: OutputParser<T>): OutputParser<T[]> {
-  return (value) => {
-    if (!Array.isArray(value)) return undefined;
-    for (const key of Reflect.ownKeys(value)) {
-      if (
-        key !== "length" &&
-        (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length)
-      ) {
-        return undefined;
-      }
-    }
-    const result: T[] = [];
-    for (let index = 0; index < value.length; index += 1) {
-      if (!Object.hasOwn(value, index)) return undefined;
-      const parsed = parse(value[index]);
-      if (parsed === undefined) return undefined;
-      result.push(parsed);
-    }
-    return result;
-  };
+function internalFailure(): ExternalFailure {
+  return { ok: false, error: { code: internalFailureCode() } };
 }
 
-const outputText: OutputParser<string> = (value) => (typeof value === "string" ? value : undefined);
-const outputBoolean: OutputParser<boolean> = (value) =>
-  typeof value === "boolean" ? value : undefined;
-const outputIdentifier: OutputParser<string> = (value) => {
-  if (typeof value !== "string" || value.length === 0 || controlCharacter(value)) return undefined;
-  return value;
+function plainRecord(value: unknown): value is Dictionary {
+  try {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
+}
+
+function ownKeys(value: object): readonly PropertyKey[] | undefined {
+  try {
+    return Reflect.ownKeys(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function ownValue(
+  record: object,
+  key: string,
+): { readonly present: true; readonly value: unknown } | { readonly present: false } | undefined {
+  try {
+    if (!Object.hasOwn(record, key)) return { present: false };
+    return { present: true, value: Reflect.get(record, key) };
+  } catch {
+    return undefined;
+  }
+}
+
+const forbiddenPrototypeKey = (key: string): boolean =>
+  key === "__proto__" || key === "constructor" || key === "prototype";
+
+const reservedAttributeKey = (key: string): boolean => {
+  const normalized = key.replace(/[_.-]/g, "").toLowerCase();
+  return /^(?:__proto__|constructor|prototype|actor|role|capabilit|claim|token|credential|session|provider|auth|authorit|identity|resourceid|convex|document|database|repository|persist|deploy|catalog)/.test(
+    normalized,
+  );
 };
 
-function outputChoice<const Values extends readonly string[]>(
-  values: Values,
-): OutputParser<Values[number]> {
-  return (value) => {
-    if (typeof value !== "string") return undefined;
-    return values.includes(value as Values[number]) ? (value as Values[number]) : undefined;
-  };
+function propertyPath(path: string, key: string): string {
+  return path === "$" ? key : `${path}.${key}`;
 }
 
-function validateOutput<T>(parse: OutputParser<T>, value: unknown): ExternalValidationResult<T> {
+function hasControlCharacter(value: string): boolean {
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+}
+
+function generatedModel(name: string): RuntimeModel | undefined {
+  return semanticManifest.models.find((candidate) => candidate.name === name);
+}
+
+function generatedEnum(name: string): RuntimeEnum | undefined {
+  return semanticManifest.enums.find((candidate) => candidate.name === name);
+}
+
+function generatedUnion(name: string): RuntimeUnion | undefined {
+  return semanticManifest.unions.find((candidate) => candidate.name === name);
+}
+
+function generatedScalar(name: string): RuntimeScalar | undefined {
+  return semanticManifest.scalars.find((candidate) => candidate.name === name);
+}
+
+type LegacyAttributeTypes = {
+  readonly key: RuntimeType;
+  readonly value: RuntimeType;
+};
+
+function legacyAttributeTypes(type: RuntimeType): LegacyAttributeTypes | undefined {
+  if (type.kind !== "array" || type.element.kind !== "named") return undefined;
+  const attributeModel = generatedModel(type.element.name);
+  if (attributeModel === undefined) return undefined;
+  const key = attributeModel.properties.find(({ name }) => name === "attributeCode");
+  const value = attributeModel.properties.find(({ name }) => name === "value");
+  if (key === undefined || value === undefined) return undefined;
+  return { key: key.type, value: value.type };
+}
+
+function parseLegacyAttributeMap(
+  types: LegacyAttributeTypes,
+  value: unknown,
+  path: string,
+  stack: readonly string[],
+): ParseResult {
+  if (!plainRecord(value)) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const keys = ownKeys(value);
+  if (keys === undefined) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const result: Dictionary = {};
+  for (const key of keys) {
+    if (typeof key !== "string" || forbiddenPrototypeKey(key) || reservedAttributeKey(key)) {
+      return parseFailure(
+        propertyPath(path, typeof key === "string" ? key : "*"),
+        generatedReason("UNSUPPORTED"),
+        "UNKNOWN_FIELD",
+      );
+    }
+    const parsedKey = parseType(types.key, key, propertyPath(path, key), stack);
+    if (!parsedKey.success) return parsedKey;
+    const item = ownValue(value, key);
+    if (item === undefined || !item.present) {
+      return parseFailure(propertyPath(path, key), generatedReason("INVALID_FORMAT"));
+    }
+    const parsed = parseType(types.value, item.value, propertyPath(path, key), stack);
+    if (!parsed.success) return parsed;
+    result[key] = parsed.value;
+  }
+  return { success: true, value: result };
+}
+
+function parseLegacyRequest(
+  model: RuntimeModel,
+  value: unknown,
+  path: string,
+  stack: readonly string[],
+): ParseResult | undefined {
+  if (!plainRecord(value)) return undefined;
+  const attributes = model.properties.find(({ name }) => name === "attributes");
+  if (attributes === undefined) return undefined;
+  const types = legacyAttributeTypes(attributes.type);
+  if (types === undefined) return undefined;
+  const attributeValue = ownValue(value, attributes.name);
+  if (attributeValue === undefined || !attributeValue.present) return undefined;
+  if (!plainRecord(attributeValue.value)) return undefined;
+
+  const keys = ownKeys(value);
+  if (keys === undefined) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const allowed = new Set(model.properties.map(({ name }) => name));
+  for (const key of keys) {
+    if (typeof key !== "string" || forbiddenPrototypeKey(key) || !allowed.has(key)) {
+      return parseFailure(
+        propertyPath(path, typeof key === "string" ? key : "*"),
+        generatedReason("UNSUPPORTED"),
+        "UNKNOWN_FIELD",
+      );
+    }
+  }
+
+  const result: Dictionary = {};
+  for (const property of model.properties) {
+    if (forbiddenPrototypeKey(property.name)) {
+      return parseFailure(
+        propertyPath(path, property.name),
+        generatedReason("UNSUPPORTED"),
+        "UNKNOWN_FIELD",
+      );
+    }
+    const item = ownValue(value, property.name);
+    if (item === undefined)
+      return parseFailure(propertyPath(path, property.name), generatedReason("INVALID_FORMAT"));
+    if (!item.present) {
+      if (property.optional) continue;
+      return parseFailure(propertyPath(path, property.name), generatedReason("REQUIRED"));
+    }
+    const parsed =
+      property.name === attributes.name
+        ? parseLegacyAttributeMap(types, item.value, propertyPath(path, property.name), stack)
+        : parseType(property.type, item.value, propertyPath(path, property.name), stack);
+    if (!parsed.success) return parsed;
+    result[property.name] = parsed.value;
+  }
+  return { success: true, value: result };
+}
+
+function canonicalArrayIndex(key: string, length: number): number | undefined {
+  if (!/^(0|[1-9]\d*)$/.test(key)) return undefined;
+  const index = Number(key);
+  return Number.isSafeInteger(index) && index >= 0 && index < length && String(index) === key
+    ? index
+    : undefined;
+}
+
+function ownArrayValue(
+  value: readonly unknown[],
+  index: number,
+): { readonly present: true; readonly value: unknown } | { readonly present: false } | undefined {
   try {
-    const result = parse(value);
-    return result === undefined ? internalFailure() : result;
+    if (!Object.hasOwn(value, index)) return { present: false };
+    return { present: true, value: value[index] };
+  } catch {
+    return undefined;
+  }
+}
+
+function parseArray(
+  type: Extract<RuntimeType, { readonly kind: "array" }>,
+  value: unknown,
+  path: string,
+  stack: readonly string[],
+): ParseResult {
+  if (!Array.isArray(value)) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const keys = ownKeys(value);
+  if (keys === undefined) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+
+  let length: number;
+  try {
+    length = value.length;
+  } catch {
+    return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  }
+  if (!Number.isSafeInteger(length) || length < 0) {
+    return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  }
+
+  for (const key of keys) {
+    if (key === "length") continue;
+    if (typeof key !== "string" || canonicalArrayIndex(key, length) === undefined) {
+      return parseFailure(path, generatedReason("UNSUPPORTED"), "UNKNOWN_FIELD");
+    }
+  }
+
+  const result: unknown[] = [];
+  for (let index = 0; index < length; index += 1) {
+    const item = ownArrayValue(value, index);
+    if (item === undefined || !item.present) {
+      return parseFailure(`${path}[${index}]`, generatedReason("REQUIRED"));
+    }
+    const parsed = parseType(type.element, item.value, `${path}[${index}]`, stack);
+    if (!parsed.success) return parsed;
+    result.push(parsed.value);
+  }
+  return { success: true, value: result };
+}
+
+function parseRecord(
+  type: Extract<RuntimeType, { readonly kind: "record" }>,
+  value: unknown,
+  path: string,
+  stack: readonly string[],
+): ParseResult {
+  if (!plainRecord(value)) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const keys = ownKeys(value);
+  if (keys === undefined) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const result: Dictionary = {};
+  for (const key of keys) {
+    if (typeof key !== "string" || forbiddenPrototypeKey(key) || reservedAttributeKey(key)) {
+      return parseFailure(
+        propertyPath(path, typeof key === "string" ? key : "*"),
+        generatedReason("UNSUPPORTED"),
+        "UNKNOWN_FIELD",
+      );
+    }
+    const item = ownValue(value, key);
+    if (item === undefined || !item.present) {
+      return parseFailure(propertyPath(path, key), generatedReason("INVALID_FORMAT"));
+    }
+    const parsed = parseType(type.value, item.value, propertyPath(path, key), stack);
+    if (!parsed.success) return parsed;
+    result[key] = parsed.value;
+  }
+  return { success: true, value: result };
+}
+
+function parseObject(
+  properties: readonly RuntimeProperty[],
+  indexer: { readonly value: RuntimeType } | null | undefined,
+  value: unknown,
+  path: string,
+  stack: readonly string[],
+): ParseResult {
+  if (!plainRecord(value)) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const keys = ownKeys(value);
+  if (keys === undefined) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const allowed = new Set(properties.map(({ name }) => name));
+  if (indexer === null || indexer === undefined) {
+    for (const key of keys) {
+      if (typeof key !== "string" || forbiddenPrototypeKey(key) || !allowed.has(key)) {
+        return parseFailure(
+          propertyPath(path, typeof key === "string" ? key : "*"),
+          generatedReason("UNSUPPORTED"),
+          "UNKNOWN_FIELD",
+        );
+      }
+    }
+  }
+
+  const result: Dictionary = {};
+  for (const property of properties) {
+    if (forbiddenPrototypeKey(property.name)) {
+      return parseFailure(
+        propertyPath(path, property.name),
+        generatedReason("UNSUPPORTED"),
+        "UNKNOWN_FIELD",
+      );
+    }
+    const item = ownValue(value, property.name);
+    if (item === undefined)
+      return parseFailure(propertyPath(path, property.name), generatedReason("INVALID_FORMAT"));
+    if (!item.present) {
+      if (property.optional) continue;
+      return parseFailure(propertyPath(path, property.name), generatedReason("REQUIRED"));
+    }
+    const parsed = parseType(property.type, item.value, propertyPath(path, property.name), stack);
+    if (!parsed.success) return parsed;
+    if (
+      property.name === "attributeCode" &&
+      typeof parsed.value === "string" &&
+      reservedAttributeKey(parsed.value)
+    ) {
+      return parseFailure(
+        propertyPath(path, property.name),
+        generatedReason("UNSUPPORTED"),
+        "UNKNOWN_FIELD",
+      );
+    }
+    if (
+      property.name === "cursor" &&
+      typeof parsed.value === "string" &&
+      (parsed.value.length === 0 || hasControlCharacter(parsed.value))
+    ) {
+      return parseFailure(
+        propertyPath(path, property.name),
+        generatedReason("INVALID_FORMAT"),
+        "INVALID_VALUE",
+      );
+    }
+    result[property.name] = parsed.value;
+  }
+
+  if (indexer !== null && indexer !== undefined) {
+    for (const key of keys) {
+      if (typeof key !== "string" || forbiddenPrototypeKey(key) || reservedAttributeKey(key)) {
+        return parseFailure(
+          propertyPath(path, typeof key === "string" ? key : "*"),
+          generatedReason("UNSUPPORTED"),
+          "UNKNOWN_FIELD",
+        );
+      }
+      if (allowed.has(key)) continue;
+      const item = ownValue(value, key);
+      if (item === undefined || !item.present) {
+        return parseFailure(propertyPath(path, key), generatedReason("INVALID_FORMAT"));
+      }
+      const parsed = parseType(indexer.value, item.value, propertyPath(path, key), stack);
+      if (!parsed.success) return parsed;
+      result[key] = parsed.value;
+    }
+  }
+  return { success: true, value: result };
+}
+
+function parseScalar(scalar: RuntimeScalar, value: unknown, path: string): ParseResult {
+  const { base, constraints } = scalar;
+  if (base === "string") {
+    if (typeof value !== "string")
+      return parseFailure(path, generatedReason("INVALID_FORMAT"), "TYPE");
+    if (constraints.minLength !== undefined && value.length < constraints.minLength) {
+      return parseFailure(path, generatedReason("OUT_OF_RANGE"));
+    }
+    if (constraints.maxLength !== undefined && value.length > constraints.maxLength) {
+      return parseFailure(path, generatedReason("OUT_OF_RANGE"));
+    }
+    if (constraints.pattern !== undefined) {
+      let matches = false;
+      try {
+        matches = new RegExp(constraints.pattern).test(value);
+      } catch {
+        return parseFailure(path, generatedReason("INVALID_FORMAT"));
+      }
+      if (!matches) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+    }
+    if (constraints.minLength !== undefined && hasControlCharacter(value)) {
+      return parseFailure(path, generatedReason("INVALID_FORMAT"));
+    }
+    return { success: true, value };
+  }
+
+  if (base === "boolean") {
+    return typeof value === "boolean"
+      ? { success: true, value }
+      : parseFailure(path, generatedReason("INVALID_FORMAT"), "TYPE");
+  }
+
+  if (base !== "int32") return parseFailure(path, generatedReason("INVALID_FORMAT"), "TYPE");
+  if (typeof value !== "number" || !Number.isSafeInteger(value)) {
+    return parseFailure(path, generatedReason("INVALID_FORMAT"), "TYPE");
+  }
+  if (value < 0 || value > 2147483647) {
+    return parseFailure(path, generatedReason("OUT_OF_RANGE"));
+  }
+  if (constraints.minValue !== undefined && value < constraints.minValue) {
+    return parseFailure(path, generatedReason("OUT_OF_RANGE"));
+  }
+  if (constraints.maxValue !== undefined && value > constraints.maxValue) {
+    return parseFailure(path, generatedReason("OUT_OF_RANGE"));
+  }
+  return { success: true, value };
+}
+
+function pascalFailureName(code: string): string {
+  return `${code
+    .toLowerCase()
+    .split("_")
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join("")}Failure`;
+}
+
+function failureVariant(
+  union: RuntimeUnion,
+  value: unknown,
+): { readonly name: string; readonly type: RuntimeType } | undefined {
+  if (!plainRecord(value)) return undefined;
+  const code = ownValue(value, "code");
+  if (code === undefined || !code.present || typeof code.value !== "string") return undefined;
+  const expectedModel = pascalFailureName(code.value);
+  return union.variants.find(({ type }) => type.kind === "named" && type.name === expectedModel);
+}
+
+function parseFieldIssue(
+  model: RuntimeModel,
+  value: unknown,
+  path: string,
+  stack: readonly string[],
+): ParseResult {
+  const fieldProperty = model.properties.find(({ name }) => name === "field");
+  const reasonProperty = model.properties.find(({ name }) => name === "reason");
+  if (fieldProperty === undefined || reasonProperty === undefined) {
+    return parseObject(model.properties, model.indexer, value, path, stack);
+  }
+  if (!plainRecord(value)) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const keys = ownKeys(value);
+  if (keys === undefined) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const field = ownValue(value, "field");
+  const legacyPath = ownValue(value, "path");
+  const reason = ownValue(value, "reason");
+  if (field === undefined || legacyPath === undefined || reason === undefined) {
+    return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  }
+  const fieldKey =
+    field.present && !legacyPath.present
+      ? "field"
+      : !field.present && legacyPath.present
+        ? "path"
+        : undefined;
+  if (fieldKey === undefined || !reason.present) {
+    return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  }
+  for (const key of keys) {
+    if (typeof key !== "string" || (key !== fieldKey && key !== "reason")) {
+      return parseFailure(
+        propertyPath(path, typeof key === "string" ? key : "*"),
+        generatedReason("UNSUPPORTED"),
+        "UNKNOWN_FIELD",
+      );
+    }
+  }
+
+  const fieldValue =
+    fieldKey === "field"
+      ? field.present
+        ? field.value
+        : undefined
+      : legacyPath.present
+        ? legacyPath.value
+        : undefined;
+  const parsedField = parseType(
+    fieldProperty.type,
+    fieldValue,
+    propertyPath(path, fieldKey),
+    stack,
+  );
+  if (!parsedField.success) return parsedField;
+  const parsedReason = parseType(
+    reasonProperty.type,
+    reason.value,
+    propertyPath(path, "reason"),
+    stack,
+  );
+  if (parsedReason.success) {
+    const result: Dictionary = {};
+    result[fieldKey] = parsedField.value;
+    result.reason = parsedReason.value;
+    return { success: true, value: result };
+  }
+  if (fieldKey !== "path" || !legacyFieldIssueReason(reason.value)) return parsedReason;
+  const result: Dictionary = {};
+  result.path = parsedField.value;
+  result.reason = reason.value;
+  return { success: true, value: result };
+}
+
+function parseUnion(
+  union: RuntimeUnion,
+  value: unknown,
+  path: string,
+  stack: readonly string[],
+): ParseResult {
+  const failure = failureVariant(union, value);
+  if (failure !== undefined) return parseType(failure.type, value, path, stack);
+
+  let firstFailure: ParseFailure | undefined;
+  for (const variant of union.variants) {
+    const parsed = parseType(variant.type, value, path, stack);
+    if (parsed.success) return parsed;
+    if (firstFailure === undefined) firstFailure = parsed;
+  }
+  return firstFailure ?? parseFailure(path, generatedReason("INVALID_FORMAT"));
+}
+
+function parseNamed(
+  name: string,
+  value: unknown,
+  path: string,
+  stack: readonly string[],
+): ParseResult {
+  if (stack.includes(name)) return parseFailure(path, generatedReason("INVALID_FORMAT"));
+  const nextStack = stack.concat(name);
+  const model = generatedModel(name);
+  if (model !== undefined) {
+    const isFieldIssue =
+      model.properties.some(({ name: propertyName }) => propertyName === "field") &&
+      model.properties.some(({ name: propertyName }) => propertyName === "reason");
+    return isFieldIssue
+      ? parseFieldIssue(model, value, path, nextStack)
+      : parseObject(model.properties, model.indexer, value, path, nextStack);
+  }
+  const enumeration = generatedEnum(name);
+  if (enumeration !== undefined) {
+    for (const candidate of enumeration.values) {
+      if (Object.is(candidate, value)) return { success: true, value: candidate };
+    }
+    return parseFailure(path, generatedReason("UNSUPPORTED"), "INVALID_VALUE");
+  }
+  const union = generatedUnion(name);
+  if (union !== undefined) return parseUnion(union, value, path, nextStack);
+  const scalar = generatedScalar(name);
+  if (scalar !== undefined) return parseScalar(scalar, value, path);
+  return parseFailure(path, generatedReason("INVALID_FORMAT"));
+}
+
+function parseType(
+  type: RuntimeType,
+  value: unknown,
+  path: string,
+  stack: readonly string[],
+): ParseResult {
+  switch (type.kind) {
+    case "array":
+      return parseArray(type, value, path, stack);
+    case "literal":
+      return Object.is(type.value, value)
+        ? { success: true, value }
+        : parseFailure(path, generatedReason("UNSUPPORTED"), "INVALID_VALUE");
+    case "object":
+      return parseObject(type.properties, null, value, path, stack);
+    case "named":
+      return parseNamed(type.name, value, path, stack);
+    case "nullable":
+      return value === null
+        ? { success: true, value: null }
+        : parseType(type.type, value, path, stack);
+    case "record":
+      return parseRecord(type, value, path, stack);
+    case "scalar":
+      return parseScalar({ name: type.name, base: type.name, constraints: {} }, value, path);
+  }
+}
+
+function successful<T>(
+  result: ParseResult,
+): result is { readonly success: true; readonly value: T } {
+  return result.success;
+}
+
+function operationDefinition(operation: ExternalOperation) {
+  return semanticManifest.operations.find(({ name }) => name === operation);
+}
+
+function safeRequest<Operation extends ExternalOperation>(
+  operation: Operation,
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<Operation>> {
+  try {
+    const definition = operationDefinition(operation);
+    if (definition === undefined) return invalid("operation", "INVALID_VALUE");
+    const result = parseNamed(definition.request, value, "$", []);
+    if (result.success) {
+      if (!successful<ExternalRequest<Operation>>(result)) return invalid("$", "TYPE");
+      return result.value;
+    }
+    const model = generatedModel(definition.request);
+    const legacy = model === undefined ? undefined : parseLegacyRequest(model, value, "$", []);
+    if (legacy !== undefined) {
+      if (!legacy.success) return invalid(legacy.path, legacy.legacyReason);
+      if (!successful<ExternalRequest<Operation>>(legacy)) return invalid("$", "TYPE");
+      return legacy.value;
+    }
+    return invalid(result.path, result.legacyReason);
+  } catch {
+    return invalid("$", generatedReason("INVALID_FORMAT"));
+  }
+}
+
+function safeSuccess<Operation extends ExternalOperation>(
+  operation: Operation,
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<Operation>> {
+  try {
+    const definition = operationDefinition(operation);
+    if (definition === undefined) return internalFailure();
+    const result = parseNamed(definition.success, value, "$", []);
+    if (result.success && successful<ExternalSuccess<Operation>>(result)) return result.value;
+    const model = generatedModel(definition.success);
+    if (model === undefined || model.properties.length !== 1 || model.indexer !== undefined) {
+      return internalFailure();
+    }
+    const property = model.properties[0];
+    if (property === undefined || property.optional) return internalFailure();
+    const legacy = parseType(property.type, value, "$", []);
+    if (!legacy.success || !successful<ExternalSuccess<Operation>>(legacy))
+      return internalFailure();
+    return legacy.value;
   } catch {
     return internalFailure();
   }
 }
 
-const codeName = outputShape({ code: outputIdentifier, name: outputText });
-const taxonomyFamily = outputShape({
-  code: outputIdentifier,
-  name: outputText,
-  types: outputArrayOf(codeName),
-});
-const taxonomyEntry = outputShape({
-  code: outputIdentifier,
-  name: outputText,
-  families: outputArrayOf(taxonomyFamily),
-});
-
-const schemaResult = outputShape({
-  mode: outputChoice(externalSchemaResultModes),
-  identity: outputBoolean,
-});
-const schemaRule = outputShape({
-  when: outputShape({ attributeCode: outputIdentifier, optionCode: outputIdentifier }),
-  result: schemaResult,
-});
-const schemaAttribute = outputShape({
-  code: outputIdentifier,
-  name: outputText,
-  kind: outputChoice(externalAttributeKinds),
-  meaning: outputText,
-  defaultResult: schemaResult,
-  rules: outputArrayOf(schemaRule),
-});
-
-const option = outputShape({ code: outputIdentifier, label: outputText });
-const outputQuantity: OutputParser<ExternalAttributeValue> = outputShape({
-  magnitude: outputIdentifier,
-  unitCode: outputIdentifier,
-});
-const outputAttributeValue: OutputParser<ExternalAttributeValue> = (value) => {
-  if (typeof value === "string" || typeof value === "boolean") return value;
-  return outputQuantity(value);
-};
-const outputResourceAttribute: OutputParser<ExternalSuccess<"getResource">["attributes"][number]> =
-  outputShape({
-    attributeCode: outputIdentifier,
-    value: outputAttributeValue,
-    displayValue: outputText,
-    identityParticipating: outputBoolean,
-  });
-const outputRevision: OutputParser<number> = (value) =>
-  typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
-const outputResource: OutputParser<ExternalSuccess<"getResource">> = outputShape({
-  resourceId: outputIdentifier,
-  classCode: outputIdentifier,
-  familyCode: outputIdentifier,
-  typeCode: outputIdentifier,
-  naturalUnitCode: outputIdentifier,
-  attributes: outputArrayOf(outputResourceAttribute),
-  canonicalIdentity: outputIdentifier,
-  identityPolicyVersion: outputChoice(["v1"] as const),
-  active: outputBoolean,
-  revision: outputRevision,
-});
-const outputSummary: OutputParser<ExternalSuccess<"searchResources">["items"][number]> =
-  outputShape({
-    resourceId: outputIdentifier,
-    classCode: outputIdentifier,
-    className: outputText,
-    familyCode: outputIdentifier,
-    familyName: outputText,
-    typeCode: outputIdentifier,
-    typeName: outputText,
-    naturalUnitCode: outputIdentifier,
-    description: outputText,
-    optionCodes: outputArrayOf(outputIdentifier),
-    optionLabels: outputArrayOf(outputText),
-    values: outputArrayOf(outputText),
-  });
-const outputCursor: OutputParser<string | null> = (value) =>
-  value === null ? null : outputIdentifier(value);
-const outputSearch: OutputParser<ExternalSuccess<"searchResources">> = outputShape({
-  items: outputArrayOf(outputSummary),
-  cursor: outputCursor,
-});
-const outputDescription: OutputParser<ExternalSuccess<"describeResource">> = outputShape({
-  resourceId: outputIdentifier,
-  description: outputText,
-});
-
-export function validateExternalGetTaxonomySuccess(
+export function parseExternalOperationIdentifier(
   value: unknown,
-): ExternalValidationResult<ExternalSuccess<"getTaxonomy">> {
-  return validateOutput(outputArrayOf(taxonomyEntry), value);
-}
-
-export function validateExternalGetEffectiveResourceSchemaSuccess(
-  value: unknown,
-): ExternalValidationResult<ExternalSuccess<"getEffectiveResourceSchema">> {
-  return validateOutput(outputShape({ attributes: outputArrayOf(schemaAttribute) }), value);
-}
-
-export function validateExternalGetValidOptionsSuccess(
-  value: unknown,
-): ExternalValidationResult<ExternalSuccess<"getValidOptions">> {
-  return validateOutput(outputArrayOf(option), value);
-}
-
-export function validateExternalGetNaturalUnitsSuccess(
-  value: unknown,
-): ExternalValidationResult<ExternalSuccess<"getNaturalUnits">> {
-  return validateOutput(
-    outputShape({ allowed: outputArrayOf(codeName), suggested: codeName }),
-    value,
-  );
-}
-
-export function validateExternalGetResourceSuccess(
-  value: unknown,
-): ExternalValidationResult<ExternalSuccess<"getResource">> {
-  return validateOutput(outputResource, value);
-}
-
-export function validateExternalSearchResourcesSuccess(
-  value: unknown,
-): ExternalValidationResult<ExternalSuccess<"searchResources">> {
-  return validateOutput(outputSearch, value);
-}
-
-export function validateExternalDescribeResourceSuccess(
-  value: unknown,
-): ExternalValidationResult<ExternalSuccess<"describeResource">> {
-  return validateOutput(outputDescription, value);
-}
-
-export function validateExternalCreateResourceSuccess(
-  value: unknown,
-): ExternalValidationResult<ExternalSuccess<"createResource">> {
-  return validateOutput(outputResource, value);
-}
-
-export function validateExternalUpdateNonIdentityDataSuccess(
-  value: unknown,
-): ExternalValidationResult<ExternalSuccess<"updateNonIdentityData">> {
-  return validateOutput(outputResource, value);
-}
-
-export function validateExternalDeactivateResourceSuccess(
-  value: unknown,
-): ExternalValidationResult<ExternalSuccess<"deactivateResource">> {
-  return validateOutput(outputResource, value);
-}
-
-type ParsedOptional<T> =
-  | { readonly present: false }
-  | { readonly present: true; readonly value: T };
-
-function closedFailureObject(
-  value: unknown,
-  allowedKeys: readonly string[],
-): Dictionary | undefined {
-  if (!plainObject(value)) return undefined;
-  for (const key of Reflect.ownKeys(value)) {
-    if (typeof key !== "string" || !allowedKeys.includes(key)) return undefined;
-  }
-  return value;
-}
-
-function parseOptionalFailureField<T>(
-  record: Dictionary,
-  key: string,
-  parse: OutputParser<T>,
-): ParsedOptional<T> | undefined {
-  if (!Object.hasOwn(record, key)) return { present: false };
-  const parsed = parse(record[key]);
-  return parsed === undefined ? undefined : { present: true, value: parsed };
-}
-
-const failureFieldIssue: OutputParser<ExternalFieldIssue> = outputShape({
-  path: outputIdentifier,
-  reason: outputChoice(externalFieldIssueReasons),
-});
-const failureFieldIssues: OutputParser<readonly ExternalFieldIssue[]> =
-  outputArrayOf(failureFieldIssue);
-
-function parseFieldIssueError(
-  record: Dictionary,
-  code: "INVALID_ARGUMENT" | "INVALID_REFERENCE" | "VALIDATION_FAILED",
-): ExternalError | undefined {
-  const closed = closedFailureObject(record, ["code", "fieldIssues"]);
-  if (closed === undefined) return undefined;
-  const fieldIssues = parseOptionalFailureField(closed, "fieldIssues", failureFieldIssues);
-  if (fieldIssues === undefined) return undefined;
-  return fieldIssues.present ? { code, fieldIssues: fieldIssues.value } : { code };
-}
-
-function parseDuplicateError(record: Dictionary): ExternalError | undefined {
-  const closed = closedFailureObject(record, ["code", "existingResourceId"]);
-  if (closed === undefined) return undefined;
-  const existingResourceId = parseOptionalFailureField(
-    closed,
-    "existingResourceId",
-    outputIdentifier,
-  );
-  if (existingResourceId === undefined) return undefined;
-  return existingResourceId.present
-    ? { code: "DUPLICATE", existingResourceId: existingResourceId.value }
-    : { code: "DUPLICATE" };
-}
-
-function parseConflictError(record: Dictionary): ExternalError | undefined {
-  const closed = closedFailureObject(record, ["code", "currentRevision"]);
-  if (closed === undefined) return undefined;
-  const currentRevision = parseOptionalFailureField(closed, "currentRevision", outputRevision);
-  if (currentRevision === undefined) return undefined;
-  return currentRevision.present
-    ? { code: "CONFLICT", currentRevision: currentRevision.value }
-    : { code: "CONFLICT" };
-}
-
-function parseExternalError(value: unknown): ExternalError | undefined {
-  const record = closedFailureObject(value, [
-    "code",
-    "fieldIssues",
-    "existingResourceId",
-    "currentRevision",
-  ]);
-  if (record === undefined) return undefined;
-  const code = outputChoice(externalErrorCodes)(record.code);
-  if (code === undefined) return undefined;
-
-  switch (code) {
-    case "INVALID_ARGUMENT":
-    case "INVALID_REFERENCE":
-    case "VALIDATION_FAILED":
-      return parseFieldIssueError(record, code);
-    case "DUPLICATE":
-      return parseDuplicateError(record);
-    case "CONFLICT":
-      return parseConflictError(record);
-    case "UNAUTHENTICATED":
-    case "FORBIDDEN":
-    case "NOT_FOUND":
-    case "INVALID_LIFECYCLE":
-    case "CATALOG_UNAVAILABLE":
-    case "INTERNAL_FAILURE": {
-      const closed = closedFailureObject(record, ["code"]);
-      return closed === undefined ? undefined : { code };
-    }
+): ExternalOperation | ExternalFailure {
+  try {
+    if (typeof value !== "string") return invalid("operation", "TYPE");
+    const operation = semanticManifest.operations.find(({ name }) => name === value)?.name;
+    return operation ?? invalid("operation", "INVALID_VALUE");
+  } catch {
+    return invalid("operation", "TYPE");
   }
 }
+
+export function validateExternalGetTaxonomyRequest(
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"getTaxonomy">> {
+  return safeRequest("getTaxonomy", value);
+}
+
+export const validateExternalGetEffectiveResourceSchemaRequest = (
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"getEffectiveResourceSchema">> =>
+  safeRequest("getEffectiveResourceSchema", value);
+
+export const validateExternalGetValidOptionsRequest = (
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"getValidOptions">> =>
+  safeRequest("getValidOptions", value);
+
+export const validateExternalGetNaturalUnitsRequest = (
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"getNaturalUnits">> =>
+  safeRequest("getNaturalUnits", value);
+
+export const validateExternalGetResourceRequest = (
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"getResource">> => safeRequest("getResource", value);
+
+export const validateExternalSearchResourcesRequest = (
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"searchResources">> =>
+  safeRequest("searchResources", value);
+
+export const validateExternalDescribeResourceRequest = (
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"describeResource">> =>
+  safeRequest("describeResource", value);
+
+export const validateExternalCreateResourceRequest = (
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"createResource">> =>
+  safeRequest("createResource", value);
+
+export const validateExternalUpdateNonIdentityDataRequest = (
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"updateNonIdentityData">> =>
+  safeRequest("updateNonIdentityData", value);
+
+export const validateExternalDeactivateResourceRequest = (
+  value: unknown,
+): ExternalValidationResult<ExternalRequest<"deactivateResource">> =>
+  safeRequest("deactivateResource", value);
+
+export const validateExternalGetTaxonomySuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getTaxonomy">> => safeSuccess("getTaxonomy", value);
+
+export const validateExternalGetEffectiveResourceSchemaSuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getEffectiveResourceSchema">> =>
+  safeSuccess("getEffectiveResourceSchema", value);
+
+export const validateExternalGetValidOptionsSuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getValidOptions">> =>
+  safeSuccess("getValidOptions", value);
+
+export const validateExternalGetNaturalUnitsSuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getNaturalUnits">> =>
+  safeSuccess("getNaturalUnits", value);
+
+export const validateExternalGetResourceSuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"getResource">> => safeSuccess("getResource", value);
+
+export const validateExternalSearchResourcesSuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"searchResources">> =>
+  safeSuccess("searchResources", value);
+
+export const validateExternalDescribeResourceSuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"describeResource">> =>
+  safeSuccess("describeResource", value);
+
+export const validateExternalCreateResourceSuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"createResource">> =>
+  safeSuccess("createResource", value);
+
+export const validateExternalUpdateNonIdentityDataSuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"updateNonIdentityData">> =>
+  safeSuccess("updateNonIdentityData", value);
+
+export const validateExternalDeactivateResourceSuccess = (
+  value: unknown,
+): ExternalValidationResult<ExternalSuccess<"deactivateResource">> =>
+  safeSuccess("deactivateResource", value);
 
 export function validateExternalFailure(value: unknown): ExternalFailure {
   try {
-    const record = closedFailureObject(value, ["ok", "error"]);
-    if (record === undefined || record.ok !== false || !Object.hasOwn(record, "error")) {
+    if (!plainRecord(value)) return internalFailure();
+    const keys = ownKeys(value);
+    if (
+      keys === undefined ||
+      keys.length !== 2 ||
+      !keys.every((key) => key === "ok" || key === "error")
+    ) {
       return internalFailure();
     }
-    const error = parseExternalError(record.error);
-    return error === undefined ? internalFailure() : { ok: false, error };
+    const ok = ownValue(value, "ok");
+    const error = ownValue(value, "error");
+    if (
+      ok === undefined ||
+      error === undefined ||
+      !ok.present ||
+      !error.present ||
+      ok.value !== false
+    ) {
+      return internalFailure();
+    }
+    const parsed = parseNamed("SafeFailure", error.value, "$.error", []);
+    if (!parsed.success || !successful<ExternalError>(parsed)) return internalFailure();
+    return { ok: false, error: parsed.value };
   } catch {
     return internalFailure();
   }

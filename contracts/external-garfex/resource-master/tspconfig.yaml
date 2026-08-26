@@ -1,0 +1,7 @@
+kind: project
+entrypoint: main.tsp
+emit:
+  - "@garfex/typespec-semantic-manifest"
+options:
+  "@garfex/typespec-semantic-manifest":
+    emitter-output-dir: "{project-root}/generated"

@@ -6,6 +6,7 @@ export default defineConfig({
       "apps/**/*.{test,spec}.{ts,mts}",
       "packages/**/*.{test,spec}.{ts,mts}",
       "tooling/tests/**/*.{test,spec}.{ts,mts}",
+      "tooling/typespec-semantic-manifest/tests/**/*.{test,spec}.{ts,mts}",
     ],
     exclude: ["apps/**/dist/**"],
     coverage: {

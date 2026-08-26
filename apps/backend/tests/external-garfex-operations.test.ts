@@ -1,4 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import * as validators from "../src/external-garfex-boundary/client-facing/validation.js";
+import * as operations from "../src/external-garfex-boundary/composition.js";
+import type { TrustedActorResolver } from "../src/external-garfex-boundary/trusted/identity.js";
+import * as mutations from "../src/external-garfex-boundary/trusted/mutation-operations.js";
+import * as projections from "../src/external-garfex-boundary/trusted/projections.js";
+import type { ResourceRepository } from "../src/resource-master/application/ports/resource-repository.js";
 import { createResourceMaster } from "../src/resource-master/application/resource-master.js";
 import type {
   ActorContext,
@@ -9,12 +15,6 @@ import type {
   ResourceView,
   TaxonomyView,
 } from "../src/resource-master/public.js";
-import type { ResourceRepository } from "../src/resource-master/application/ports/resource-repository.js";
-import type { TrustedActorResolver } from "../src/external-garfex-boundary/trusted/identity.js";
-import * as operations from "../src/external-garfex-boundary/trusted/read-operations.js";
-import * as mutations from "../src/external-garfex-boundary/trusted/mutation-operations.js";
-import * as projections from "../src/external-garfex-boundary/trusted/projections.js";
-import * as validators from "../src/external-garfex-boundary/client-facing/validation.js";
 
 type SearchSuccess = { readonly items: ResourceSummary[]; readonly cursor: string | null };
 type DescriptionSuccess = { readonly resourceId: string; readonly description: string };

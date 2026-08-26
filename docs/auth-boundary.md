@@ -145,6 +145,14 @@ The implementation and its tests enforce that:
 
 Client-side route guards or hidden controls may improve usability but never satisfy enforcement.
 
+## External contract relationship
+
+TypeSpec is the GARFEX-owned external semantic authority at [`contracts/external-garfex/resource-master/`](../contracts/external-garfex/resource-master/). Its manifest, [accepted baseline](../contracts/external-garfex/resource-master/baseline/accepted-semantic-manifest.json), and [generated consumer semantics](./generated/resource-master-external-contract.md) are linked by stale-artifact, compatibility, and documentation parity gates. The external contract has exactly ten named operations: `getTaxonomy`, `getEffectiveResourceSchema`, `getValidOptions`, `getNaturalUnits`, `getResource`, `searchResources`, `describeResource`, `createResource`, `updateNonIdentityData`, and `deactivateResource`; each maps one-to-one to the same Resource Master operation and uses the capability table above. Its eleven safe errors are `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_ARGUMENT`, `INVALID_REFERENCE`, `VALIDATION_FAILED`, `NOT_FOUND`, `DUPLICATE`, `CONFLICT`, `INVALID_LIFECYCLE`, `CATALOG_UNAVAILABLE`, and `INTERNAL_FAILURE`, with only applicable `fieldIssues`, `existingResourceId`, or `currentRevision` metadata.
+
+These are three distinct responsibilities: TypeSpec owns client-safe meaning; the trusted edge owns authentication, fresh actor construction, explicit named mappings, projection, and safe normalization; Resource Master owns the final deny-by-default capability check. Convex remains private infrastructure behind application-owned ports. Revision `1` is opaque and compared exactly; no transport, wire-auth, provider, UI, SDK, publication, or version-policy decision follows.
+
+Related records: [GARFEX boundary](./external-garfex-boundary.md), [external client boundary](./external-client-boundary.md), and [architecture](./architecture.md).
+
 ## Open and deferred work
 
 There is no User domain, module, or persistence; user management; login UI; productive identity provider; or productive authentication strategy. Pi remains only a future replaceable Surface/UI, and its physical transport remains open. Before any productive or externally reachable use, GARFEX still needs an explicitly selected productive identity adapter, deployment configuration, and integration validation.
