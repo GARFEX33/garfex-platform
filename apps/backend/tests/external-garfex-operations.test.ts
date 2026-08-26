@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import * as validators from "../src/external-garfex-boundary/client-facing/validation.js";
 import * as operations from "../src/external-garfex-boundary/composition.js";
 import type { TrustedActorResolver } from "../src/external-garfex-boundary/trusted/identity.js";
-import * as mutations from "../src/external-garfex-boundary/trusted/mutation-operations.js";
 import * as projections from "../src/external-garfex-boundary/trusted/projections.js";
 import type { ResourceRepository } from "../src/resource-master/application/ports/resource-repository.js";
 import { createResourceMaster } from "../src/resource-master/application/resource-master.js";
@@ -113,15 +112,17 @@ describe("external GARFEX success projections", () => {
     const projectedOptions = projections.projectExternalGetValidOptions(options);
     const projectedUnits = projections.projectExternalGetNaturalUnits(units);
 
-    expect(projectedTaxonomy).toEqual([
-      {
-        code: "hardware",
-        name: "Hardware",
-        families: [
-          { code: "wire", name: "Wire", types: [{ code: "solid-wire", name: "Solid wire" }] },
-        ],
-      },
-    ]);
+    expect(projectedTaxonomy).toEqual({
+      items: [
+        {
+          code: "hardware",
+          name: "Hardware",
+          families: [
+            { code: "wire", name: "Wire", types: [{ code: "solid-wire", name: "Solid wire" }] },
+          ],
+        },
+      ],
+    });
     expect(projectedSchema).toEqual({
       attributes: [
         {
@@ -139,16 +140,16 @@ describe("external GARFEX success projections", () => {
         },
       ],
     });
-    expect(projectedOptions).toEqual([{ code: "bare", label: "Bare" }]);
+    expect(projectedOptions).toEqual({ options: [{ code: "bare", label: "Bare" }] });
     expect(projectedUnits).toEqual({
       allowed: [{ code: "meter", name: "Meter" }],
       suggested: { code: "meter", name: "Meter" },
     });
     expect(projectedTaxonomy).not.toBe(taxonomy);
-    expect(projectedTaxonomy[0]?.families[0]?.types[0]).not.toBe(sharedType);
+    expect(projectedTaxonomy.items[0]?.families[0]?.types[0]).not.toBe(sharedType);
     expect(projectedSchema.attributes[0]?.defaultResult).not.toBe(defaultResult);
     expect(projectedSchema.attributes[0]?.rules[0]?.when).not.toBe(ruleWhen);
-    expect(projectedOptions[0]).not.toBe(option);
+    expect(projectedOptions.options[0]).not.toBe(option);
     expect(projectedUnits.allowed[0]).not.toBe(unit);
     expect(projectedUnits.suggested).not.toBe(unit);
 
@@ -195,29 +196,31 @@ describe("external GARFEX success projections", () => {
       convexId: "convex-secret",
     } as unknown as ResourceView;
     const expected = {
-      resourceId: "resource-1",
-      classCode: "hardware",
-      familyCode: "wire",
-      typeCode: "solid-wire",
-      naturalUnitCode: "meter",
-      attributes: [
-        {
-          attributeCode: "finish",
-          value: "bare",
-          displayValue: "Bare",
-          identityParticipating: true,
-        },
-        {
-          attributeCode: "gauge",
-          value: { magnitude: "12", unitCode: "awg" },
-          displayValue: "12",
-          identityParticipating: true,
-        },
-      ],
-      canonicalIdentity: "hardware|wire|solid-wire|finish=bare|gauge=12-awg",
-      identityPolicyVersion: "v1" as const,
-      active: true,
-      revision: 3,
+      resource: {
+        resourceId: "resource-1",
+        classCode: "hardware",
+        familyCode: "wire",
+        typeCode: "solid-wire",
+        naturalUnitCode: "meter",
+        attributes: [
+          {
+            attributeCode: "finish",
+            value: "bare",
+            displayValue: "Bare",
+            identityParticipating: true,
+          },
+          {
+            attributeCode: "gauge",
+            value: { magnitude: "12", unitCode: "awg" },
+            displayValue: "12",
+            identityParticipating: true,
+          },
+        ],
+        canonicalIdentity: "hardware|wire|solid-wire|finish=bare|gauge=12-awg",
+        identityPolicyVersion: "v1" as const,
+        active: true,
+        revision: 3,
+      },
     };
     const projected = [
       projections.projectExternalGetResource(resource),
@@ -229,8 +232,8 @@ describe("external GARFEX success projections", () => {
     for (const result of projected) {
       expect(result).toEqual(expected);
       expect(result).not.toBe(resource);
-      expect(result.attributes).not.toBe(resource.attributes);
-      expect(result.attributes[1]?.value).not.toBe(quantity);
+      expect(result.resource.attributes).not.toBe(resource.attributes);
+      expect(result.resource.attributes[1]?.value).not.toBe(quantity);
     }
     expectValidated(projected[0], validators.validateExternalGetResourceSuccess);
     expectValidated(projected[1], validators.validateExternalCreateResourceSuccess);
@@ -425,7 +428,15 @@ describe("external GARFEX named read invocations", () => {
       const resolveActor = vi.fn(async () => readActor);
       const result = await runRead(testCase, testCase.request, methods, resolveActor);
 
-      expect(result).toEqual({ ok: true, value: testCase.internal });
+      const expectedValue =
+        testCase.method === "getTaxonomy"
+          ? { items: testCase.internal }
+          : testCase.method === "getValidOptions"
+            ? { options: testCase.internal }
+            : testCase.method === "getResource"
+              ? { resource: testCase.internal }
+              : testCase.internal;
+      expect(result).toEqual({ ok: true, value: expectedValue });
       expect(resolveActor).toHaveBeenCalledOnce();
       expect(methods[testCase.method]).toHaveBeenCalledOnce();
       const args = methods[testCase.method].mock.calls[0] as unknown[];
@@ -454,7 +465,7 @@ describe("external GARFEX named read invocations", () => {
         ok: false,
         error: {
           code: "INVALID_ARGUMENT",
-          fieldIssues: [{ path: "unexpected", reason: "UNKNOWN_FIELD" }],
+          fieldIssues: [{ field: "unexpected", reason: "UNSUPPORTED" }],
         },
       });
       expect(resolveActor).not.toHaveBeenCalled();
@@ -620,14 +631,14 @@ describe("external GARFEX U7 search invocation", () => {
   });
 
   it.each([
-    { request: { terms: "wire", lifecycle: "BROKEN" }, path: "lifecycle", reason: "INVALID_VALUE" },
-    { request: { terms: "wire", limit: 0 }, path: "limit", reason: "OUT_OF_RANGE" },
-    { request: { terms: "wire", limit: 51 }, path: "limit", reason: "OUT_OF_RANGE" },
-    { request: { terms: "wire", cursor: 12 }, path: "cursor", reason: "TYPE" },
-    { request: { terms: "wire", cursor: "" }, path: "cursor", reason: "INVALID_VALUE" },
+    { request: { terms: "wire", lifecycle: "BROKEN" }, field: "lifecycle", reason: "UNSUPPORTED" },
+    { request: { terms: "wire", limit: 0 }, field: "limit", reason: "OUT_OF_RANGE" },
+    { request: { terms: "wire", limit: 51 }, field: "limit", reason: "OUT_OF_RANGE" },
+    { request: { terms: "wire", cursor: 12 }, field: "cursor", reason: "INVALID_FORMAT" },
+    { request: { terms: "wire", cursor: "" }, field: "cursor", reason: "OUT_OF_RANGE" },
   ] as const)(
-    "rejects malformed pagination in $path before auth or module work",
-    async ({ request, path, reason }) => {
+    "rejects malformed pagination in $field before auth or module work",
+    async ({ request, field, reason }) => {
       const methods = readMethodSpies();
       const resolveActor = vi.fn(async () => readActor);
 
@@ -635,7 +646,7 @@ describe("external GARFEX U7 search invocation", () => {
 
       expect(result).toEqual({
         ok: false,
-        error: { code: "INVALID_ARGUMENT", fieldIssues: [{ path, reason }] },
+        error: { code: "INVALID_ARGUMENT", fieldIssues: [{ field, reason }] },
       });
       expect(resolveActor).not.toHaveBeenCalled();
       for (const spy of Object.values(methods)) expect(spy).not.toHaveBeenCalled();
@@ -668,31 +679,38 @@ const mutationAttribute = { magnitude: "12", unitCode: "awg" };
 const mutationCases: readonly MutationCase[] = [
   {
     method: "createResource",
-    invoke: mutations.invokeExternalCreateResource,
+    invoke: operations.invokeExternalCreateResource,
     request: {
       classCode: "hardware",
       familyCode: "wire",
       typeCode: "solid-wire",
       naturalUnitCode: "meter",
-      attributes: { gauge: mutationAttribute },
+      attributes: [
+        {
+          attributeCode: "gauge",
+          value: mutationAttribute,
+          displayValue: "12",
+          identityParticipating: true,
+        },
+      ],
     },
     mappedInput: {
       classCode: "hardware",
       familyCode: "wire",
       typeCode: "solid-wire",
       naturalUnitCode: "meter",
-      attributes: { gauge: { magnitude: "12", unitCode: "awg" } },
+      attributes: { gauge: mutationAttribute },
     },
   },
   {
     method: "updateNonIdentityData",
-    invoke: mutations.invokeExternalUpdateNonIdentityData,
+    invoke: operations.invokeExternalUpdateNonIdentityData,
     request: { resourceId: "resource-1", expectedRevision: 3, naturalUnitCode: "meter" },
     mappedInput: { resourceId: "resource-1", expectedRevision: 3, naturalUnitCode: "meter" },
   },
   {
     method: "deactivateResource",
-    invoke: mutations.invokeExternalDeactivateResource,
+    invoke: operations.invokeExternalDeactivateResource,
     request: { resourceId: "resource-1", expectedRevision: 3 },
     mappedInput: { resourceId: "resource-1", expectedRevision: 3 },
   },
@@ -738,7 +756,7 @@ describe("external GARFEX named mutation invocations", () => {
       const request = testCase.request;
       const result = await runMutation(testCase, request, methods, async () => mutationActor);
 
-      expect(result).toEqual({ ok: true, value: resourceReadSuccess });
+      expect(result).toEqual({ ok: true, value: { resource: resourceReadSuccess } });
       expect(methods[testCase.method]).toHaveBeenCalledOnce();
       const args = methods[testCase.method].mock.calls[0] as unknown[];
       expect(args[0]).toBe(mutationActor);

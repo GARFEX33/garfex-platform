@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Resource Master native Convex smoke evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidenceKind",
+    "evidenceStatus",
+    "matrixVersion",
+    "targetKind",
+    "redactedTarget",
+    "smokeIdentity"
+  ],
+  "properties": {
+    "evidenceKind": { "const": "real-generated-client-smoke" },
+    "evidenceStatus": { "enum": ["complete", "pending-rerun"] },
+    "matrixVersion": { "const": "JD-S-002/closed-v2" },
+    "targetKind": { "enum": ["local-anonymous", "dev"] },
+    "redactedTarget": { "type": "string", "pattern": "^(https?://)?[A-Za-z0-9.:-]+$" },
+    "smokeIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "gauge"],
+      "properties": {
+        "runId": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "gauge": { "type": "string", "pattern": "^[1-9][0-9]*$" }
+      }
+    },
+    "commit": { "type": "string" },
+    "worktree": { "type": "string" },
+    "convexVersion": { "const": "1.45.0" },
+    "manifestDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "generatedValidatorDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "generatedClientDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "catalogRevision": { "type": ["integer", "null"] },
+    "bootstrapCommand": {
+      "type": "string",
+      "pattern": "^(?!.*(CONVEX_DEPLOY_KEY|token|secret)).*$"
+    },
+    "commandExitStatus": { "type": "integer" },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "observed"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "category": { "enum": ["transport-rejection", "canonical-invalid", "accepted"] },
+          "observed": { "enum": ["transport-rejection", "canonical-invalid", "accepted"] },
+          "exitStatus": { "type": "integer" },
+          "downstreamWork": { "enum": ["not-invoked", "invoked", "unknown"] }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "evidenceStatus": { "const": "complete" } } },
+      "then": { "required": ["cases"] }
+    },
+    {
+      "if": { "properties": { "evidenceStatus": { "const": "pending-rerun" } } },
+      "then": { "not": { "required": ["cases"] } }
+    }
+  ]
+}

@@ -11,8 +11,9 @@ Convex infrastructure, or any future consumer public.
 3. Call one named Resource Master operation, which performs the final deny-by-default capability check.
 4. Project and validate one reviewed success or one closed external failure.
 
-This change creates no network reachability. The named functions are a trusted backend seam, not a route,
-transport, SDK, or universal API.
+The named functions are a trusted backend seam and the existing ten native Convex bindings are accepted
+only for GARFEX-owned compatible local/development clients. This is not a public route, HTTP adapter, SDK,
+or universal API; productive and third-party reachability remain unaccepted.
 
 ## Closed operation contract
 
@@ -164,15 +165,15 @@ corepack pnpm check
 ```
 
 The root gate invokes the non-writing contract check before formatting, lint, typecheck, tests,
-architecture checks, and build. No command publishes clients, deploys, selects a transport, or changes
-Resource Master behavior.
+architecture checks, and build. No command publishes clients, deploys, or changes Resource Master behavior.
+Native Convex acceptance is downstream of TypeSpec and does not make the semantic contract transport-specific.
 
 ## Convex encapsulation
 
-Convex remains a private infrastructure and platform adapter behind Resource Master application-owned
-ports. No external contract source imports Convex or generated bindings; no Convex entrypoint exposes
-this boundary; no persistence record, document identifier, catalog installer, or deployment value is an
-external field. Resource Master authorization and projections remain the only path to business results.
+Convex remains a private infrastructure adapter behind Resource Master application-owned ports. The
+downstream native adapter is documented in [resource-master-convex-native-transport.md](./resource-master-convex-native-transport.md);
+no external semantic source imports Convex or generated bindings, and no persistence record, document
+identifier, catalog installer, or deployment value is an external field.
 
 ## Explicit non-decisions
 
@@ -189,11 +190,11 @@ consumer-behavior
 ```
 <!-- garfex:non-decisions:end -->
 
-- **Transport, protocol, status, and framing:** no HTTP, RPC, Convex-mediated exposure, route, status-code
-  mapping, serialization protocol, or framing is selected.
+- **Transport, protocol, status, and framing:** no HTTP/RPC route, public status mapping, or additional
+  transport is selected. Native Convex is accepted only as the documented downstream local/development adapter.
 - **Network reachability:** this semantic seam is not a network endpoint and makes no reachability claim.
-- **Schema, IDL, and generation:** no schema or IDL source, runtime-validation technology, code-generation
-  tool, artifact format, or generation direction is selected.
+- **Schema, IDL, and generation:** TypeSpec remains the semantic source; the native validator artifact is
+  downstream and deterministic. No SDK or public publication mechanism is selected.
 - **SDK, distribution, and version mechanics:** no SDK, generated client, package, registry, hosting,
   version identifier, compatibility window, deprecation rule, or distribution process is selected.
 - **Productive IdP and session:** no productive identity provider, credential, token, claim, session,
@@ -214,10 +215,11 @@ feeds the generated [consumer semantics](./generated/resource-master-external-co
 and the compatibility fixture. The stale-artifact and breaking-change gates reject drift, stale outputs,
 and unapproved breaking changes before acceptance or publication.
 
-The three boundaries are deliberately distinct: TypeSpec owns client-safe meaning; the trusted edge owns
+The four layers are deliberately distinct: TypeSpec owns client-safe meaning; the trusted edge owns
 validation, authentication composition, fresh actor construction, named mapping, projection, and failure
-normalization; Resource Master owns the in-process actor-first contract and final deny-by-default capability
-authorization. Convex remains private infrastructure behind Resource Master application-owned ports.
+normalization; Resource Master owns the actor-first contract and final deny-by-default authorization; the
+native Convex binding is a downstream adapter. The amended decision supersedes only the earlier transport
+non-decision for GARFEX-owned compatible local/development clients.
 
 ## Linked boundary records
 

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -33,6 +33,22 @@ const externalBoundaryRules = [
   "external-contract-exact-ten",
 ] as const;
 
+const nativeEntrypointSource = () =>
+  readFileSync(resolve(root, "apps/backend/convex/resourceMaster.ts"), "utf8");
+
+const nativeOperations = [
+  "getTaxonomy",
+  "getEffectiveResourceSchema",
+  "getValidOptions",
+  "getNaturalUnits",
+  "getResource",
+  "searchResources",
+  "describeResource",
+  "createResource",
+  "updateNonIdentityData",
+  "deactivateResource",
+] as const;
+
 const focusedExternalBoundaryFixtures = [
   ["internal-import.ts", "external-contract-independent", "client-facing"],
   ["authority-field.ts", "external-contract-no-authority", "client-facing"],
@@ -56,6 +72,29 @@ describe("architecture fitness functions", () => {
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain("architecture check passed");
+  });
+
+  it("keeps exactly one named ten-operation native family", () => {
+    const source = nativeEntrypointSource();
+    const exports = [...source.matchAll(/export const (\w+) = (query|mutation)\(/g)].map(
+      ([, name, kind]) => [name, kind],
+    );
+    expect(exports).toEqual([
+      ...nativeOperations.slice(0, 7).map((name) => [name, "query"]),
+      ...nativeOperations.slice(7).map((name) => [name, "mutation"]),
+    ]);
+    for (const operation of nativeOperations) {
+      const compositionName = `${operation.charAt(0).toUpperCase()}${operation.slice(1)}`;
+      expect(source).toContain(`invokeExternal${compositionName}`);
+      expect(source.match(new RegExp(`export const ${operation}\\s*=`, "g"))).toHaveLength(1);
+    }
+    expect(source).not.toMatch(/execute|dispatch|operationRegistry|operationMap|universalPayload/);
+    expect(
+      readFileSync(
+        resolve(root, "apps/backend/src/external-garfex-boundary/trusted/mutation-operations.ts"),
+        "utf8",
+      ),
+    ).not.toMatch(/invokeExternal(?:Create|Update|Deactivate)Resource/);
   });
 
   it("reports every controlled boundary violation by rule name", () => {

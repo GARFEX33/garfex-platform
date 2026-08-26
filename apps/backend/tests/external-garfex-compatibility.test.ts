@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { ExternalOperation } from "../src/external-garfex-boundary/client-facing/contract.js";
 import * as validators from "../src/external-garfex-boundary/client-facing/validation.js";
 import * as reads from "../src/external-garfex-boundary/composition.js";
-import * as mutations from "../src/external-garfex-boundary/trusted/mutation-operations.js";
 import type { ActorContext, ResourceMaster } from "../src/resource-master/public.js";
 
 const fixtureUrl = new URL(
@@ -99,19 +98,19 @@ const cases: Record<ExternalOperation, OperationCase> = {
   createResource: [
     validators.validateExternalCreateResourceRequest,
     validators.validateExternalCreateResourceSuccess,
-    mutations.invokeExternalCreateResource,
+    reads.invokeExternalCreateResource,
     "createResource",
   ],
   updateNonIdentityData: [
     validators.validateExternalUpdateNonIdentityDataRequest,
     validators.validateExternalUpdateNonIdentityDataSuccess,
-    mutations.invokeExternalUpdateNonIdentityData,
+    reads.invokeExternalUpdateNonIdentityData,
     "updateNonIdentityData",
   ],
   deactivateResource: [
     validators.validateExternalDeactivateResourceRequest,
     validators.validateExternalDeactivateResourceSuccess,
-    mutations.invokeExternalDeactivateResource,
+    reads.invokeExternalDeactivateResource,
     "deactivateResource",
   ],
 };
@@ -174,6 +173,17 @@ function dependencies(resourceMaster: ResourceMaster): Dependencies {
     },
     resourceMaster,
   };
+}
+function moduleSuccess(operation: ExternalOperation, success: unknown): unknown {
+  if (operation === "getTaxonomy") return record(success).items;
+  if (operation === "getValidOptions") return record(success).options;
+  if (
+    ["getResource", "createResource", "updateNonIdentityData", "deactivateResource"].includes(
+      operation,
+    )
+  )
+    return record(success).resource;
+  return success;
 }
 function expectOnlyNamedMethod(
   methods: Record<string, { mock: { calls: unknown[][] } }>,
@@ -243,7 +253,10 @@ describe("external GARFEX semantic compatibility evidence", () => {
     "%s fixture drives its named stub and deep-compares serialized success/failure",
     async (operation) => {
       const entry = record(record(loadFixture().operations)[operation]);
-      const successStub = fixtureMaster(operation, { ok: true, value: entry.success });
+      const successStub = fixtureMaster(operation, {
+        ok: true,
+        value: moduleSuccess(operation, entry.success),
+      });
       const success = await cases[operation][2](
         entry.request,
         dependencies(successStub.resourceMaster),

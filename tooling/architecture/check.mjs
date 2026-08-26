@@ -354,7 +354,7 @@ for (const module of report.modules ?? []) {
       addViolation("convex-no-public-bootstrap", from, to);
     }
     if (
-      (isResourceMasterEntrypoint(from) || isBootstrapWrapper(from, to)) &&
+      isBootstrapWrapper(from, to) &&
       ![
         "RESOURCE_CATALOG_UNAVAILABLE",
         "RESOURCE_CATALOG_UNINITIALIZED",

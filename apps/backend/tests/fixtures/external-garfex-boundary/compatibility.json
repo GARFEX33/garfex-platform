@@ -3,23 +3,39 @@
   "operations": {
     "getTaxonomy": {
       "request": {},
-      "success": [
-        {
-          "code": "hardware",
-          "name": "Hardware",
-          "families": [
-            {
-              "code": "wire",
-              "name": "Wire",
-              "types": [{ "code": "solid-wire", "name": "Solid wire" }]
-            }
-          ]
+      "success": {
+        "items": [
+          {
+            "code": "hardware",
+            "name": "Hardware",
+            "families": [
+              {
+                "code": "wire",
+                "name": "Wire",
+                "types": [
+                  {
+                    "code": "solid-wire",
+                    "name": "Solid wire"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "failure": {
+        "ok": false,
+        "error": {
+          "code": "FORBIDDEN"
         }
-      ],
-      "failure": { "ok": false, "error": { "code": "FORBIDDEN" } }
+      }
     },
     "getEffectiveResourceSchema": {
-      "request": { "classCode": "hardware", "familyCode": "wire", "typeCode": "solid-wire" },
+      "request": {
+        "classCode": "hardware",
+        "familyCode": "wire",
+        "typeCode": "solid-wire"
+      },
       "success": {
         "attributes": [
           {
@@ -27,53 +43,105 @@
             "name": "Finish",
             "kind": "CONTROLLED_OPTION",
             "meaning": "Surface finish",
-            "defaultResult": { "mode": "OPTIONAL", "identity": true },
+            "defaultResult": {
+              "mode": "OPTIONAL",
+              "identity": true
+            },
             "rules": [
               {
-                "when": { "attributeCode": "finish", "optionCode": "bare" },
-                "result": { "mode": "REQUIRED", "identity": false }
+                "when": {
+                  "attributeCode": "finish",
+                  "optionCode": "bare"
+                },
+                "result": {
+                  "mode": "REQUIRED",
+                  "identity": false
+                }
               }
             ]
           }
         ]
       },
-      "failure": { "ok": false, "error": { "code": "INVALID_REFERENCE" } }
+      "failure": {
+        "ok": false,
+        "error": {
+          "code": "INVALID_REFERENCE"
+        }
+      }
     },
     "getValidOptions": {
-      "request": { "attributeCode": "finish" },
-      "success": [{ "code": "bare", "label": "Bare" }],
-      "failure": { "ok": false, "error": { "code": "NOT_FOUND" } }
+      "request": {
+        "attributeCode": "finish"
+      },
+      "success": {
+        "options": [
+          {
+            "code": "bare",
+            "label": "Bare"
+          }
+        ]
+      },
+      "failure": {
+        "ok": false,
+        "error": {
+          "code": "NOT_FOUND"
+        }
+      }
     },
     "getNaturalUnits": {
-      "request": { "familyCode": "wire" },
-      "success": {
-        "allowed": [{ "code": "meter", "name": "Meter" }],
-        "suggested": { "code": "meter", "name": "Meter" }
+      "request": {
+        "familyCode": "wire"
       },
-      "failure": { "ok": false, "error": { "code": "CATALOG_UNAVAILABLE" } }
-    },
-    "getResource": {
-      "request": { "resourceId": "resource-1" },
       "success": {
-        "resourceId": "resource-1",
-        "classCode": "hardware",
-        "familyCode": "wire",
-        "typeCode": "solid-wire",
-        "naturalUnitCode": "meter",
-        "attributes": [
+        "allowed": [
           {
-            "attributeCode": "finish",
-            "value": "bare",
-            "displayValue": "Bare",
-            "identityParticipating": true
+            "code": "meter",
+            "name": "Meter"
           }
         ],
-        "canonicalIdentity": "hardware|wire|solid-wire|finish=bare",
-        "identityPolicyVersion": "v1",
-        "active": true,
-        "revision": 3
+        "suggested": {
+          "code": "meter",
+          "name": "Meter"
+        }
       },
-      "failure": { "ok": false, "error": { "code": "NOT_FOUND" } }
+      "failure": {
+        "ok": false,
+        "error": {
+          "code": "CATALOG_UNAVAILABLE"
+        }
+      }
+    },
+    "getResource": {
+      "request": {
+        "resourceId": "resource-1"
+      },
+      "success": {
+        "resource": {
+          "resourceId": "resource-1",
+          "classCode": "hardware",
+          "familyCode": "wire",
+          "typeCode": "solid-wire",
+          "naturalUnitCode": "meter",
+          "attributes": [
+            {
+              "attributeCode": "finish",
+              "value": "bare",
+              "displayValue": "Bare",
+              "identityParticipating": true
+            }
+          ],
+          "canonicalIdentity": "hardware|wire|solid-wire|finish=bare",
+          "identityPolicyVersion": "v1",
+          "active": true,
+          "revision": 3
+        }
+      },
+      "failure": {
+        "ok": false,
+        "error": {
+          "code": "NOT_FOUND"
+        }
+      }
     },
     "searchResources": {
       "request": {
@@ -101,12 +169,27 @@
         ],
         "cursor": "opaque|cursor-v2|private-state"
       },
-      "failure": { "ok": false, "error": { "code": "INVALID_LIFECYCLE" } }
+      "failure": {
+        "ok": false,
+        "error": {
+          "code": "INVALID_LIFECYCLE"
+        }
+      }
     },
     "describeResource": {
-      "request": { "resourceId": "resource-1" },
-      "success": { "resourceId": "resource-1", "description": "Hardware Wire Solid wire" },
-      "failure": { "ok": false, "error": { "code": "NOT_FOUND" } }
+      "request": {
+        "resourceId": "resource-1"
+      },
+      "success": {
+        "resourceId": "resource-1",
+        "description": "Hardware Wire Solid wire"
+      },
+      "failure": {
+        "ok": false,
+        "error": {
+          "code": "NOT_FOUND"
+        }
+      }
     },
     "createResource": {
       "request": {
@@ -114,112 +197,212 @@
         "familyCode": "wire",
         "typeCode": "solid-wire",
         "naturalUnitCode": "meter",
-        "attributes": { "finish": "bare", "gauge": { "magnitude": "12", "unitCode": "awg" } }
-      },
-      "success": {
-        "resourceId": "resource-2",
-        "classCode": "hardware",
-        "familyCode": "wire",
-        "typeCode": "solid-wire",
-        "naturalUnitCode": "meter",
         "attributes": [
           {
             "attributeCode": "finish",
             "value": "bare",
             "displayValue": "Bare",
             "identityParticipating": true
+          },
+          {
+            "attributeCode": "gauge",
+            "value": {
+              "magnitude": "12",
+              "unitCode": "awg"
+            },
+            "displayValue": "12",
+            "identityParticipating": true
           }
-        ],
-        "canonicalIdentity": "hardware|wire|solid-wire|finish=bare",
-        "identityPolicyVersion": "v1",
-        "active": true,
-        "revision": 1
+        ]
+      },
+      "success": {
+        "resource": {
+          "resourceId": "resource-2",
+          "classCode": "hardware",
+          "familyCode": "wire",
+          "typeCode": "solid-wire",
+          "naturalUnitCode": "meter",
+          "attributes": [
+            {
+              "attributeCode": "finish",
+              "value": "bare",
+              "displayValue": "Bare",
+              "identityParticipating": true
+            }
+          ],
+          "canonicalIdentity": "hardware|wire|solid-wire|finish=bare",
+          "identityPolicyVersion": "v1",
+          "active": true,
+          "revision": 1
+        }
       },
       "failure": {
         "ok": false,
-        "error": { "code": "DUPLICATE", "existingResourceId": "resource-1" }
+        "error": {
+          "code": "DUPLICATE",
+          "existingResourceId": "resource-1"
+        }
       }
     },
     "updateNonIdentityData": {
-      "request": { "resourceId": "resource-1", "expectedRevision": 3, "naturalUnitCode": "meter" },
-      "success": {
+      "request": {
         "resourceId": "resource-1",
-        "classCode": "hardware",
-        "familyCode": "wire",
-        "typeCode": "solid-wire",
-        "naturalUnitCode": "meter",
-        "attributes": [
-          {
-            "attributeCode": "finish",
-            "value": "bare",
-            "displayValue": "Bare",
-            "identityParticipating": true
-          }
-        ],
-        "canonicalIdentity": "hardware|wire|solid-wire|finish=bare",
-        "identityPolicyVersion": "v1",
-        "active": true,
-        "revision": 4
+        "expectedRevision": 3,
+        "naturalUnitCode": "meter"
       },
-      "failure": { "ok": false, "error": { "code": "CONFLICT", "currentRevision": 4 } }
+      "success": {
+        "resource": {
+          "resourceId": "resource-1",
+          "classCode": "hardware",
+          "familyCode": "wire",
+          "typeCode": "solid-wire",
+          "naturalUnitCode": "meter",
+          "attributes": [
+            {
+              "attributeCode": "finish",
+              "value": "bare",
+              "displayValue": "Bare",
+              "identityParticipating": true
+            }
+          ],
+          "canonicalIdentity": "hardware|wire|solid-wire|finish=bare",
+          "identityPolicyVersion": "v1",
+          "active": true,
+          "revision": 4
+        }
+      },
+      "failure": {
+        "ok": false,
+        "error": {
+          "code": "CONFLICT",
+          "currentRevision": 4
+        }
+      }
     },
     "deactivateResource": {
-      "request": { "resourceId": "resource-1", "expectedRevision": 4 },
-      "success": {
+      "request": {
         "resourceId": "resource-1",
-        "classCode": "hardware",
-        "familyCode": "wire",
-        "typeCode": "solid-wire",
-        "naturalUnitCode": "meter",
-        "attributes": [
-          {
-            "attributeCode": "finish",
-            "value": "bare",
-            "displayValue": "Bare",
-            "identityParticipating": true
-          }
-        ],
-        "canonicalIdentity": "hardware|wire|solid-wire|finish=bare",
-        "identityPolicyVersion": "v1",
-        "active": false,
-        "revision": 5
+        "expectedRevision": 4
       },
-      "failure": { "ok": false, "error": { "code": "INVALID_LIFECYCLE" } }
+      "success": {
+        "resource": {
+          "resourceId": "resource-1",
+          "classCode": "hardware",
+          "familyCode": "wire",
+          "typeCode": "solid-wire",
+          "naturalUnitCode": "meter",
+          "attributes": [
+            {
+              "attributeCode": "finish",
+              "value": "bare",
+              "displayValue": "Bare",
+              "identityParticipating": true
+            }
+          ],
+          "canonicalIdentity": "hardware|wire|solid-wire|finish=bare",
+          "identityPolicyVersion": "v1",
+          "active": false,
+          "revision": 5
+        }
+      },
+      "failure": {
+        "ok": false,
+        "error": {
+          "code": "INVALID_LIFECYCLE"
+        }
+      }
     }
   },
   "errorMatrix": {
-    "UNAUTHENTICATED": { "ok": false, "error": { "code": "UNAUTHENTICATED" } },
-    "FORBIDDEN": { "ok": false, "error": { "code": "FORBIDDEN" } },
+    "UNAUTHENTICATED": {
+      "ok": false,
+      "error": {
+        "code": "UNAUTHENTICATED"
+      }
+    },
+    "FORBIDDEN": {
+      "ok": false,
+      "error": {
+        "code": "FORBIDDEN"
+      }
+    },
     "INVALID_ARGUMENT": {
       "ok": false,
       "error": {
         "code": "INVALID_ARGUMENT",
-        "fieldIssues": [{ "path": "resourceId", "reason": "REQUIRED" }]
+        "fieldIssues": [
+          {
+            "reason": "REQUIRED",
+            "field": "resourceId"
+          }
+        ]
       }
     },
     "INVALID_REFERENCE": {
       "ok": false,
       "error": {
         "code": "INVALID_REFERENCE",
-        "fieldIssues": [{ "path": "familyCode", "reason": "INVALID_VALUE" }]
+        "fieldIssues": [
+          {
+            "reason": "UNSUPPORTED",
+            "field": "familyCode"
+          }
+        ]
       }
     },
     "VALIDATION_FAILED": {
       "ok": false,
       "error": {
         "code": "VALIDATION_FAILED",
-        "fieldIssues": [{ "path": "attributes.gauge", "reason": "TYPE" }]
+        "fieldIssues": [
+          {
+            "reason": "INVALID_FORMAT",
+            "field": "attributes.gauge"
+          }
+        ]
       }
     },
-    "NOT_FOUND": { "ok": false, "error": { "code": "NOT_FOUND" } },
+    "NOT_FOUND": {
+      "ok": false,
+      "error": {
+        "code": "NOT_FOUND"
+      }
+    },
     "DUPLICATE": {
       "ok": false,
-      "error": { "code": "DUPLICATE", "existingResourceId": "resource-1" }
+      "error": {
+        "code": "DUPLICATE",
+        "existingResourceId": "resource-1"
+      }
     },
-    "CONFLICT": { "ok": false, "error": { "code": "CONFLICT", "currentRevision": 4 } },
-    "INVALID_LIFECYCLE": { "ok": false, "error": { "code": "INVALID_LIFECYCLE" } },
-    "CATALOG_UNAVAILABLE": { "ok": false, "error": { "code": "CATALOG_UNAVAILABLE" } },
-    "INTERNAL_FAILURE": { "ok": false, "error": { "code": "INTERNAL_FAILURE" } }
+    "CONFLICT": {
+      "ok": false,
+      "error": {
+        "code": "CONFLICT",
+        "currentRevision": 4
+      }
+    },
+    "INVALID_LIFECYCLE": {
+      "ok": false,
+      "error": {
+        "code": "INVALID_LIFECYCLE"
+      }
+    },
+    "CATALOG_UNAVAILABLE": {
+      "ok": false,
+      "error": {
+        "code": "CATALOG_UNAVAILABLE"
+      }
+    },
+    "INTERNAL_FAILURE": {
+      "ok": false,
+      "error": {
+        "code": "INTERNAL_FAILURE"
+      }
+    }
   },
-  "cursorExamples": { "opaque": "opaque|cursor-v2|private-state", "final": null }
+  "cursorExamples": {
+    "opaque": "opaque|cursor-v2|private-state",
+    "final": null
+  }
 }

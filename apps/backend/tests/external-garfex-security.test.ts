@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createResourceMaster } from "../src/resource-master/application/resource-master.js";
 import type { ResourceRepository } from "../src/resource-master/application/ports/resource-repository.js";
-import * as mutations from "../src/external-garfex-boundary/trusted/mutation-operations.js";
+import * as mutations from "../src/external-garfex-boundary/composition.js";
 import {
   createAuthenticationComposition,
   type AuthenticationComposition,
@@ -157,7 +157,6 @@ describe("trusted external GARFEX error normalization", () => {
       );
     }
     for (const currentRevision of [
-      -1,
       1.5,
       Number.NaN,
       Number.POSITIVE_INFINITY,
@@ -170,6 +169,10 @@ describe("trusted external GARFEX error normalization", () => {
         error: { code: "INTERNAL_FAILURE" },
       });
     }
+    expect(normalizeResourceError(resourceErrorFor("CONFLICT", { currentRevision: -1 }))).toEqual({
+      ok: false,
+      error: { code: "CONFLICT", currentRevision: -1 },
+    });
   });
 
   it("fails closed for unknown, malformed, and throwing runtime errors", () => {
@@ -297,7 +300,14 @@ const mutationSecurityCases: readonly MutationSecurityCase[] = [
       familyCode: "wire",
       typeCode: "solid-wire",
       naturalUnitCode: "meter",
-      attributes: {},
+      attributes: [
+        {
+          attributeCode: "finish",
+          value: "bare",
+          displayValue: "Bare",
+          identityParticipating: true,
+        },
+      ],
     },
     "resource:update-non-identity",
   ],
@@ -333,7 +343,7 @@ describe("external GARFEX mutation security", () => {
         ok: false,
         error: {
           code: "INVALID_ARGUMENT",
-          fieldIssues: [{ path: "actorId", reason: "UNKNOWN_FIELD" }],
+          fieldIssues: [{ field: "actorId", reason: "UNSUPPORTED" }],
         },
       });
       expect(forgedResolveActor).not.toHaveBeenCalled();

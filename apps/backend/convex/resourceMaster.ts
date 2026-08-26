@@ -1,11 +1,26 @@
-import { v } from "convex/values";
 import { mutation, query } from "./_generated/server.js";
+import {
+  createResourceMasterContract,
+  createResourceMasterReturns,
+} from "./resourceMasterContract.generated.js";
 import {
   createConvexMutationResourceMaster,
   createConvexQueryResourceMaster,
 } from "../src/resource-master/infrastructure/convex-resource-master.js";
 import { createConfiguredAuthenticationComposition } from "../src/auth/composition.js";
-import { invokeAuthenticatedResourceMasterOperation } from "../src/auth/resource-master-edge.js";
+import type { TrustedActorResolver } from "../src/external-garfex-boundary/trusted/identity.js";
+import {
+  invokeExternalCreateResource,
+  invokeExternalDeactivateResource,
+  invokeExternalUpdateNonIdentityData,
+  invokeExternalGetEffectiveResourceSchema,
+  invokeExternalGetNaturalUnits,
+  invokeExternalGetResource,
+  invokeExternalGetTaxonomy,
+  invokeExternalGetValidOptions,
+  invokeExternalSearchResources,
+  invokeExternalDescribeResource,
+} from "../src/external-garfex-boundary/composition.js";
 
 const authenticationComposition = () =>
   createConfiguredAuthenticationComposition({
@@ -13,271 +28,111 @@ const authenticationComposition = () =>
     authMode: process.env.GARFEX_AUTH_MODE,
   });
 
-const taxonomyArgs = {
-  classCode: v.string(),
-  familyCode: v.string(),
-  typeCode: v.string(),
-};
-const attributeKind = v.union(
-  v.literal("CONTROLLED_OPTION"),
-  v.literal("INTEGER"),
-  v.literal("DECIMAL"),
-  v.literal("BOOLEAN"),
-  v.literal("CONTROLLED_TEXT"),
-  v.literal("QUANTITY"),
-);
-const applicabilityMode = v.union(
-  v.literal("REQUIRED"),
-  v.literal("OPTIONAL"),
-  v.literal("FORBIDDEN"),
-  v.literal("NOT_APPLICABLE"),
-);
-const applicabilityResult = v.object({ mode: applicabilityMode, identity: v.boolean() });
-const applicabilityRule = v.object({
-  when: v.object({ attributeCode: v.string(), optionCode: v.string() }),
-  result: applicabilityResult,
-});
-const resourceError = v.object({
-  code: v.union(
-    v.literal("UNAUTHENTICATED"),
-    v.literal("FORBIDDEN"),
-    v.literal("INVALID_ARGUMENT"),
-    v.literal("NOT_FOUND"),
-    v.literal("DUPLICATE"),
-    v.literal("INVALID_REFERENCE"),
-    v.literal("VALIDATION"),
-    v.literal("CONFLICT"),
-    v.literal("INVALID_LIFECYCLE"),
-    v.literal("INTEGRITY"),
-    v.literal("INTERNAL"),
-    v.literal("RESOURCE_CATALOG_UNAVAILABLE"),
-    v.literal("RESOURCE_CATALOG_UNINITIALIZED"),
-    v.literal("RESOURCE_CATALOG_INVALID"),
-  ),
-  message: v.string(),
-  details: v.optional(v.array(v.string())),
-  existingResourceId: v.optional(v.string()),
-  currentRevision: v.optional(v.number()),
-});
-const failureResult = v.object({ ok: v.literal(false), error: resourceError });
-const taxonomy = v.array(
-  v.object({
-    code: v.string(),
-    name: v.string(),
-    families: v.array(
-      v.object({
-        code: v.string(),
-        name: v.string(),
-        types: v.array(v.object({ code: v.string(), name: v.string() })),
-      }),
-    ),
-  }),
-);
-const effectiveSchema = v.object({
-  attributes: v.array(
-    v.object({
-      code: v.string(),
-      name: v.string(),
-      kind: attributeKind,
-      meaning: v.string(),
-      defaultResult: applicabilityResult,
-      rules: v.array(applicabilityRule),
-    }),
-  ),
-});
-const optionList = v.array(v.object({ code: v.string(), label: v.string() }));
-const namedUnit = v.object({ code: v.string(), name: v.string() });
-const naturalUnits = v.object({ allowed: v.array(namedUnit), suggested: namedUnit });
-const storedValue = v.union(
-  v.string(),
-  v.boolean(),
-  v.object({ magnitude: v.string(), unitCode: v.string() }),
-);
-const resourceView = v.object({
-  resourceId: v.string(),
-  classCode: v.string(),
-  familyCode: v.string(),
-  typeCode: v.string(),
-  naturalUnitCode: v.string(),
-  attributes: v.array(
-    v.object({
-      attributeCode: v.string(),
-      value: storedValue,
-      displayValue: v.string(),
-      identityParticipating: v.boolean(),
-    }),
-  ),
-  canonicalIdentity: v.string(),
-  identityPolicyVersion: v.literal("v1"),
-  active: v.boolean(),
-  revision: v.number(),
-});
-const resourceSummary = v.object({
-  resourceId: v.string(),
-  classCode: v.string(),
-  className: v.string(),
-  familyCode: v.string(),
-  familyName: v.string(),
-  typeCode: v.string(),
-  typeName: v.string(),
-  naturalUnitCode: v.string(),
-  description: v.string(),
-  optionCodes: v.array(v.string()),
-  optionLabels: v.array(v.string()),
-  values: v.array(v.string()),
-});
-const searchPage = v.object({
-  items: v.array(resourceSummary),
-  cursor: v.union(v.string(), v.null()),
-});
-const description = v.object({ resourceId: v.string(), description: v.string() });
-
-const internalFailure = () => ({
-  ok: false as const,
-  error: { code: "INTERNAL" as const, message: "resource operation failed" },
+const resolver = (): TrustedActorResolver => ({
+  resolveActor: async () => {
+    const composition = authenticationComposition();
+    if (composition === null) return null;
+    const actorId = await composition.identityAdapter.resolveActorId();
+    return actorId === null ? null : { actorId, capabilities: new Set(composition.capabilities) };
+  },
 });
 
 export const getTaxonomy = query({
   args: {},
-  returns: v.union(v.object({ ok: v.literal(true), value: taxonomy }), failureResult),
-  handler: async (ctx) =>
-    invokeAuthenticatedResourceMasterOperation(authenticationComposition(), (actor) =>
-      createConvexQueryResourceMaster(ctx).getTaxonomy(actor),
-    ),
+  returns: createResourceMasterReturns.getTaxonomy,
+  handler: async (ctx, args) =>
+    invokeExternalGetTaxonomy(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexQueryResourceMaster(ctx),
+    }),
 });
 
 export const getEffectiveResourceSchema = query({
-  args: taxonomyArgs,
-  returns: v.union(v.object({ ok: v.literal(true), value: effectiveSchema }), failureResult),
+  args: createResourceMasterContract.getEffectiveResourceSchema,
+  returns: createResourceMasterReturns.getEffectiveResourceSchema,
   handler: async (ctx, args) =>
-    invokeAuthenticatedResourceMasterOperation(authenticationComposition(), (actor) =>
-      createConvexQueryResourceMaster(ctx).getEffectiveResourceSchema(actor, args),
-    ),
+    invokeExternalGetEffectiveResourceSchema(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexQueryResourceMaster(ctx),
+    }),
 });
 
 export const getValidOptions = query({
-  args: { attributeCode: v.string() },
-  returns: v.union(v.object({ ok: v.literal(true), value: optionList }), failureResult),
+  args: createResourceMasterContract.getValidOptions,
+  returns: createResourceMasterReturns.getValidOptions,
   handler: async (ctx, args) =>
-    invokeAuthenticatedResourceMasterOperation(authenticationComposition(), (actor) =>
-      createConvexQueryResourceMaster(ctx).getValidOptions(actor, args),
-    ),
+    invokeExternalGetValidOptions(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexQueryResourceMaster(ctx),
+    }),
 });
 
 export const getNaturalUnits = query({
-  args: { familyCode: v.string() },
-  returns: v.union(v.object({ ok: v.literal(true), value: naturalUnits }), failureResult),
+  args: createResourceMasterContract.getNaturalUnits,
+  returns: createResourceMasterReturns.getNaturalUnits,
   handler: async (ctx, args) =>
-    invokeAuthenticatedResourceMasterOperation(authenticationComposition(), (actor) =>
-      createConvexQueryResourceMaster(ctx).getNaturalUnits(actor, args),
-    ),
-});
-
-export const createResource = mutation({
-  args: {
-    ...taxonomyArgs,
-    naturalUnitCode: v.string(),
-    attributes: v.object({
-      conductor_material: v.optional(v.string()),
-      gauge: v.optional(v.union(v.string(), v.number())),
-      insulation: v.optional(v.string()),
-      color: v.optional(v.string()),
-      voltage: v.optional(v.string()),
+    invokeExternalGetNaturalUnits(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexQueryResourceMaster(ctx),
     }),
-  },
-  returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
-  handler: async (ctx, args) => {
-    try {
-      return await invokeAuthenticatedResourceMasterOperation(
-        authenticationComposition(),
-        (actor) => createConvexMutationResourceMaster(ctx).createResource(actor, args),
-      );
-    } catch {
-      return internalFailure();
-    }
-  },
-});
-
-export const updateNonIdentityData = mutation({
-  args: {
-    resourceId: v.string(),
-    expectedRevision: v.number(),
-    naturalUnitCode: v.string(),
-  },
-  returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
-  handler: async (ctx, args) => {
-    try {
-      return await invokeAuthenticatedResourceMasterOperation(
-        authenticationComposition(),
-        (actor) => createConvexMutationResourceMaster(ctx).updateNonIdentityData(actor, args),
-      );
-    } catch {
-      return internalFailure();
-    }
-  },
-});
-
-export const deactivateResource = mutation({
-  args: { resourceId: v.string(), expectedRevision: v.number() },
-  returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
-  handler: async (ctx, args) => {
-    try {
-      return await invokeAuthenticatedResourceMasterOperation(
-        authenticationComposition(),
-        (actor) => createConvexMutationResourceMaster(ctx).deactivateResource(actor, args),
-      );
-    } catch {
-      return internalFailure();
-    }
-  },
 });
 
 export const getResource = query({
-  args: { resourceId: v.string() },
-  returns: v.union(v.object({ ok: v.literal(true), value: resourceView }), failureResult),
-  handler: async (ctx, args) => {
-    try {
-      return await invokeAuthenticatedResourceMasterOperation(
-        authenticationComposition(),
-        (actor) => createConvexQueryResourceMaster(ctx).getResource(actor, args),
-      );
-    } catch {
-      return internalFailure();
-    }
-  },
+  args: createResourceMasterContract.getResource,
+  returns: createResourceMasterReturns.getResource,
+  handler: async (ctx, args) =>
+    invokeExternalGetResource(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexQueryResourceMaster(ctx),
+    }),
 });
 
 export const searchResources = query({
-  args: {
-    terms: v.string(),
-    lifecycle: v.optional(v.union(v.literal("ACTIVE"), v.literal("INACTIVE"), v.literal("ALL"))),
-    limit: v.optional(v.number()),
-    cursor: v.optional(v.union(v.string(), v.null())),
-  },
-  returns: v.union(v.object({ ok: v.literal(true), value: searchPage }), failureResult),
-  handler: async (ctx, args) => {
-    try {
-      return await invokeAuthenticatedResourceMasterOperation(
-        authenticationComposition(),
-        (actor) => createConvexQueryResourceMaster(ctx).searchResources(actor, args),
-      );
-    } catch {
-      return internalFailure();
-    }
-  },
+  args: createResourceMasterContract.searchResources,
+  returns: createResourceMasterReturns.searchResources,
+  handler: async (ctx, args) =>
+    invokeExternalSearchResources(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexQueryResourceMaster(ctx),
+    }),
 });
 
 export const describeResource = query({
-  args: { resourceId: v.string() },
-  returns: v.union(v.object({ ok: v.literal(true), value: description }), failureResult),
-  handler: async (ctx, args) => {
-    try {
-      return await invokeAuthenticatedResourceMasterOperation(
-        authenticationComposition(),
-        (actor) => createConvexQueryResourceMaster(ctx).describeResource(actor, args),
-      );
-    } catch {
-      return internalFailure();
-    }
-  },
+  args: createResourceMasterContract.describeResource,
+  returns: createResourceMasterReturns.describeResource,
+  handler: async (ctx, args) =>
+    invokeExternalDescribeResource(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexQueryResourceMaster(ctx),
+    }),
+});
+
+export const createResource = mutation({
+  args: createResourceMasterContract.createResource,
+  returns: createResourceMasterReturns.createResource,
+  handler: async (ctx, args) =>
+    invokeExternalCreateResource(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexMutationResourceMaster(ctx),
+    }),
+});
+
+export const updateNonIdentityData = mutation({
+  args: createResourceMasterContract.updateNonIdentityData,
+  returns: createResourceMasterReturns.updateNonIdentityData,
+  handler: async (ctx, args) =>
+    invokeExternalUpdateNonIdentityData(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexMutationResourceMaster(ctx),
+    }),
+});
+
+export const deactivateResource = mutation({
+  args: createResourceMasterContract.deactivateResource,
+  returns: createResourceMasterReturns.deactivateResource,
+  handler: async (ctx, args) =>
+    invokeExternalDeactivateResource(args, {
+      actorResolver: resolver(),
+      resourceMaster: createConvexMutationResourceMaster(ctx),
+    }),
 });

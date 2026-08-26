@@ -133,11 +133,16 @@ const ordinaryRequests: ExternalRequests = {
     familyCode: "wire",
     typeCode: "solid-wire",
     naturalUnitCode: "meter",
-    attributes: {
-      finish: "bare",
-      stranded: false,
-      gauge: { magnitude: "12", unitCode: "awg" },
-    },
+    attributes: [
+      { attributeCode: "finish", value: "bare", displayValue: "Bare", identityParticipating: true },
+      { attributeCode: "stranded", value: false, displayValue: "No", identityParticipating: false },
+      {
+        attributeCode: "gauge",
+        value: { magnitude: "12", unitCode: "awg" },
+        displayValue: "12",
+        identityParticipating: true,
+      },
+    ],
   },
   updateNonIdentityData: {
     resourceId: "resource-1",
@@ -158,20 +163,20 @@ const safeFailures: ExternalFailure[] = [
   { ok: false, error: { code: "FORBIDDEN" } },
   {
     ok: false,
-    error: { code: "INVALID_ARGUMENT", fieldIssues: [{ path: "resourceId", reason: "REQUIRED" }] },
+    error: { code: "INVALID_ARGUMENT", fieldIssues: [{ field: "resourceId", reason: "REQUIRED" }] },
   },
   {
     ok: false,
     error: {
       code: "INVALID_REFERENCE",
-      fieldIssues: [{ path: "familyCode", reason: "INVALID_VALUE" }],
+      fieldIssues: [{ field: "familyCode", reason: "UNSUPPORTED" }],
     },
   },
   {
     ok: false,
     error: {
       code: "VALIDATION_FAILED",
-      fieldIssues: [{ path: "attributes.gauge", reason: "TYPE" }],
+      fieldIssues: [{ field: "attributes.gauge", reason: "INVALID_FORMAT" }],
     },
   },
   { ok: false, error: { code: "NOT_FOUND" } },
@@ -182,22 +187,24 @@ const safeFailures: ExternalFailure[] = [
   { ok: false, error: { code: "INTERNAL_FAILURE" } },
 ];
 
-const taxonomyOutcome: ExternalOutcome<"getTaxonomy"> = { ok: true, value: [] };
+const taxonomyOutcome: ExternalOutcome<"getTaxonomy"> = { ok: true, value: { items: [] } };
 void [ordinaryAttributeValues, safeFailures, taxonomyOutcome];
 
-const successTaxonomy: ExternalSuccesses["getTaxonomy"] = [
-  {
-    code: "hardware",
-    name: "Hardware",
-    families: [
-      {
-        code: "wire",
-        name: "Wire",
-        types: [{ code: "solid-wire", name: "Solid wire" }],
-      },
-    ],
-  },
-];
+const successTaxonomy: ExternalSuccesses["getTaxonomy"] = {
+  items: [
+    {
+      code: "hardware",
+      name: "Hardware",
+      families: [
+        {
+          code: "wire",
+          name: "Wire",
+          types: [{ code: "solid-wire", name: "Solid wire" }],
+        },
+      ],
+    },
+  ],
+};
 const successSchema: ExternalSuccesses["getEffectiveResourceSchema"] = {
   attributes: [
     {
@@ -215,41 +222,45 @@ const successSchema: ExternalSuccesses["getEffectiveResourceSchema"] = {
     },
   ],
 };
-const successOptions: ExternalSuccesses["getValidOptions"] = [{ code: "bare", label: "Bare" }];
+const successOptions: ExternalSuccesses["getValidOptions"] = {
+  options: [{ code: "bare", label: "Bare" }],
+};
 const successNaturalUnits: ExternalSuccesses["getNaturalUnits"] = {
   allowed: [{ code: "meter", name: "Meter" }],
   suggested: { code: "meter", name: "Meter" },
 };
 const successResource: ExternalSuccesses["getResource"] = {
-  resourceId: "resource-1",
-  classCode: "hardware",
-  familyCode: "wire",
-  typeCode: "solid-wire",
-  naturalUnitCode: "meter",
-  attributes: [
-    {
-      attributeCode: "finish",
-      value: "bare",
-      displayValue: "Bare",
-      identityParticipating: true,
-    },
-    {
-      attributeCode: "stranded",
-      value: false,
-      displayValue: "No",
-      identityParticipating: false,
-    },
-    {
-      attributeCode: "gauge",
-      value: { magnitude: "12", unitCode: "awg" },
-      displayValue: "12",
-      identityParticipating: true,
-    },
-  ],
-  canonicalIdentity: "hardware|wire|solid-wire|finish=bare|gauge=12-awg",
-  identityPolicyVersion: "v1",
-  active: true,
-  revision: 3,
+  resource: {
+    resourceId: "resource-1",
+    classCode: "hardware",
+    familyCode: "wire",
+    typeCode: "solid-wire",
+    naturalUnitCode: "meter",
+    attributes: [
+      {
+        attributeCode: "finish",
+        value: "bare",
+        displayValue: "Bare",
+        identityParticipating: true,
+      },
+      {
+        attributeCode: "stranded",
+        value: false,
+        displayValue: "No",
+        identityParticipating: false,
+      },
+      {
+        attributeCode: "gauge",
+        value: { magnitude: "12", unitCode: "awg" },
+        displayValue: "12",
+        identityParticipating: true,
+      },
+    ],
+    canonicalIdentity: "hardware|wire|solid-wire|finish=bare|gauge=12-awg",
+    identityPolicyVersion: "v1",
+    active: true,
+    revision: 3,
+  },
 };
 const successSearch: ExternalSuccesses["searchResources"] = {
   items: [
@@ -336,12 +347,12 @@ function expectInternalFailure(result: unknown): void {
 
 type SuccessExtraCase = [DiscoveryOperation, unknown];
 const extraSuccessCases: SuccessExtraCase[] = [
-  ["getTaxonomy", [{ ...successTaxonomy[0], internalField: "secret" }]],
+  ["getTaxonomy", [{ ...successTaxonomy.items[0], internalField: "secret" }]],
   [
     "getEffectiveResourceSchema",
     { ...successSchema, attributes: [{ ...successSchema.attributes[0], internalField: "secret" }] },
   ],
-  ["getValidOptions", [{ ...successOptions[0], internalField: "secret" }]],
+  ["getValidOptions", [{ ...successOptions.options[0], internalField: "secret" }]],
   [
     "getNaturalUnits",
     {
@@ -369,7 +380,9 @@ const requestValidators: Record<ExternalOperation, RequestValidator> = {
 function expectInvalid(result: unknown, path?: string): void {
   expect(result).toMatchObject({ ok: false, error: { code: "INVALID_ARGUMENT" } });
   if (path !== undefined) {
-    expect(result).toMatchObject({ error: { fieldIssues: [{ path }] } });
+    expect(result).toMatchObject({
+      error: { fieldIssues: [{ field: path.startsWith("attributes.") ? "attributes" : path }] },
+    });
   }
 }
 
@@ -475,7 +488,7 @@ describe("external GARFEX client-facing contract", () => {
           naturalUnitCode: "u",
           attributes: { actorId: "forged" },
         }),
-        "attributes.actorId",
+        "attributes",
       );
       expectInvalid(
         validateExternalCreateResourceRequest({
@@ -485,7 +498,7 @@ describe("external GARFEX client-facing contract", () => {
           naturalUnitCode: "u",
           attributes: { providerId: "forged" },
         }),
-        "attributes.providerId",
+        "attributes",
       );
       expectInvalid(
         validateExternalCreateResourceRequest({
@@ -526,7 +539,7 @@ describe("external GARFEX client-facing contract", () => {
           "cursor",
         );
       }
-      for (const value of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      for (const value of [1.5, Number.MAX_SAFE_INTEGER + 1]) {
         expectInvalid(
           validateExternalDeactivateResourceRequest({ resourceId: "r", expectedRevision: value }),
           "expectedRevision",
@@ -639,7 +652,10 @@ describe("external GARFEX client-facing contract", () => {
       );
       expectInternalFailure(
         validateExternalGetTaxonomySuccess(
-          Object.assign([...successTaxonomy], { internalField: "secret" }),
+          Object.assign(
+            { ...successTaxonomy, items: [...successTaxonomy.items] },
+            { internalField: "secret" },
+          ),
         ),
       );
       expectInternalFailure(
@@ -655,10 +671,10 @@ describe("external GARFEX client-facing contract", () => {
       entry.code = "hardware";
       entry.name = "Hardware";
       entry.families = [];
-      const result = validateExternalGetTaxonomySuccess([entry]);
-      expect(result).toEqual([{ code: "hardware", name: "Hardware", families: [] }]);
-      if (!Array.isArray(result)) return;
-      expect(result[0]).not.toBe(entry);
+      const result = validateExternalGetTaxonomySuccess({ items: [entry] });
+      expect(result).toEqual({ items: [{ code: "hardware", name: "Hardware", families: [] }] });
+      if ("ok" in result) return;
+      expect(result.items[0]).not.toBe(entry);
     });
 
     it("contains symbols, accessors, sparse arrays, and hostile attribute keys", () => {
@@ -777,7 +793,7 @@ describe("external GARFEX client-facing contract", () => {
 
       const resourceWithNestedPlatformField = {
         ...successResource,
-        attributes: successResource.attributes.map((attribute) =>
+        attributes: successResource.resource.attributes.map((attribute) =>
           attribute.attributeCode === "finish"
             ? { ...attribute, platformSecret: "hidden" }
             : attribute,
@@ -787,7 +803,7 @@ describe("external GARFEX client-facing contract", () => {
 
       const resourceWithQuantityExtra = {
         ...successResource,
-        attributes: successResource.attributes.map((attribute) =>
+        attributes: successResource.resource.attributes.map((attribute) =>
           attribute.attributeCode === "gauge"
             ? { ...attribute, value: { magnitude: "12", unitCode: "awg", internalUnit: "hidden" } }
             : attribute,
@@ -938,7 +954,7 @@ describe("external GARFEX client-facing contract", () => {
                 get path(): never {
                   throw new Error("authority-secret");
                 },
-                reason: "TYPE",
+                reason: "INVALID_FORMAT",
               },
             ],
           },
@@ -979,7 +995,7 @@ describe("external GARFEX client-facing contract", () => {
           ok: false,
           error: {
             code: "INVALID_ARGUMENT",
-            fieldIssues: [{ path: "field", reason: "TYPE" }],
+            fieldIssues: [{ field: "field", reason: "INVALID_FORMAT" }],
             extra: true,
           },
         },
@@ -996,7 +1012,6 @@ describe("external GARFEX client-facing contract", () => {
           error: { code: "CONFLICT", currentRevision: 2, existingResourceId: "resource-1" },
         },
         { ok: false, error: { code: "DUPLICATE", existingResourceId: "" } },
-        { ok: false, error: { code: "CONFLICT", currentRevision: -1 } },
         { ok: false, error: { code: "CONFLICT", currentRevision: 1.5 } },
         { ok: false, error: { code: "INVALID_ARGUMENT", fieldIssues: "not-an-array" } },
         { ok: false, error: { code: "INVALID_ARGUMENT", fieldIssues: [null] } },
@@ -1004,28 +1019,28 @@ describe("external GARFEX client-facing contract", () => {
           ok: false,
           error: {
             code: "INVALID_ARGUMENT",
-            fieldIssues: [{ path: "", reason: "TYPE" }],
+            fieldIssues: [{ field: "", reason: "INVALID_FORMAT" }],
           },
         },
         {
           ok: false,
           error: {
             code: "INVALID_ARGUMENT",
-            fieldIssues: [{ path: "field\nsecret", reason: "TYPE" }],
+            fieldIssues: [{ field: "field\nsecret", reason: "INVALID_FORMAT" }],
           },
         },
         {
           ok: false,
           error: {
             code: "INVALID_ARGUMENT",
-            fieldIssues: [{ path: "field", reason: "UNKNOWN_REASON" }],
+            fieldIssues: [{ field: "field", reason: "UNKNOWN_REASON" }],
           },
         },
         {
           ok: false,
           error: {
             code: "INVALID_ARGUMENT",
-            fieldIssues: [{ path: "field", reason: "TYPE", value: "secret" }],
+            fieldIssues: [{ field: "field", reason: "INVALID_FORMAT", value: "secret" }],
           },
         },
         symbolFailure,
@@ -1071,7 +1086,7 @@ describe("external GARFEX client-facing contract", () => {
           ok: false,
           error: {
             code: "INVALID_ARGUMENT",
-            fieldIssues: [{ path: "field", reason: "TYPE", message: secrets[0] }],
+            fieldIssues: [{ field: "field", reason: "INVALID_FORMAT", message: secrets[0] }],
           },
         },
       ];
@@ -1085,7 +1100,7 @@ describe("external GARFEX client-facing contract", () => {
       }
 
       expect(JSON.stringify(validateExternalFailure(safeFailures[2]))).toBe(
-        '{"ok":false,"error":{"code":"INVALID_ARGUMENT","fieldIssues":[{"path":"resourceId","reason":"REQUIRED"}]}}',
+        '{"ok":false,"error":{"code":"INVALID_ARGUMENT","fieldIssues":[{"field":"resourceId","reason":"REQUIRED"}]}}',
       );
     });
   });

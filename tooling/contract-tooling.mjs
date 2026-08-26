@@ -13,13 +13,23 @@ const runtimePath = join(
   "apps/backend/src/external-garfex-boundary/client-facing/generated/semantic-contract.generated.ts",
 );
 const docsPath = join(root, "docs/generated/resource-master-external-contract.md");
+const convexValidatorPath = join(root, "apps/backend/convex/resourceMasterContract.generated.ts");
+const { generateConvexValidators } = await import("./convex-validator-generator.mjs");
 
-const run = (command, args, cwd = root) => {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8" });
+const run = (command, args, cwd = root, input) => {
+  const result = spawnSync(command, args, { cwd, encoding: "utf8", input });
   if (result.status !== 0)
     throw new Error(`${command} ${args.join(" ")} failed\n${result.stdout}\n${result.stderr}`);
   return result.stdout;
 };
+
+const formatConvexValidators = (source) =>
+  run(
+    "corepack",
+    ["pnpm", "exec", "biome", "format", "--stdin-file-path", "resourceMasterContract.generated.ts"],
+    root,
+    source,
+  );
 
 const compile = (cwd, noEmit) =>
   run("corepack", ["pnpm", "exec", "tsp", "compile", ".", ...(noEmit ? ["--no-emit"] : [])], cwd);
@@ -41,8 +51,14 @@ const materialize = async (manifest, write) => {
 
 const generate = async () => {
   compile(contract, false);
-  const manifest = json(manifestPath);
+  const manifestBytes = await readFile(manifestPath, "utf8");
+  const manifest = JSON.parse(manifestBytes);
   await materialize(manifest, true);
+  await writeFile(
+    convexValidatorPath,
+    formatConvexValidators(generateConvexValidators(manifest, manifestBytes)),
+    "utf8",
+  );
   console.log("contract:generate wrote manifest, runtime, and consumer documentation");
 };
 
@@ -79,6 +95,10 @@ const check = async () => {
     const artifacts = materializeArtifacts(candidate);
     const runtime = await readFile(runtimePath, "utf8");
     const documentation = await readFile(docsPath, "utf8");
+    const convexValidators = await readFile(convexValidatorPath, "utf8");
+    const expectedConvexValidators = formatConvexValidators(
+      generateConvexValidators(candidate, candidateBytes),
+    );
     const artifactIssues = checkMaterializedArtifacts(candidate, {
       runtime,
       documentation,
@@ -86,7 +106,11 @@ const check = async () => {
     });
     if (artifactIssues.length)
       throw new Error(artifactIssues.map((issue) => issue.message).join("; "));
-    if (runtime !== artifacts.runtime || documentation !== artifacts.documentation)
+    if (
+      runtime !== artifacts.runtime ||
+      documentation !== artifacts.documentation ||
+      convexValidators !== expectedConvexValidators
+    )
       throw new Error("generated artifact parity failed");
     console.log(
       `contract:check passed; digest ${digestOf(candidateBytes)}; temporary generation cleaned`,

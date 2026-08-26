@@ -49,8 +49,9 @@ Convex, persistence adapters, generated bindings, infrastructure, deployment rep
 module internals stay private to the backend. A future client-facing contract may express public
 meaning, but it must not expose or import those implementation details.
 
-The backend owns the public external boundary and its compatibility policy. This decision does not
-copy or redefine UI architecture; it constrains what the backend may publish or consume.
+The backend owns the public external boundary and its compatibility policy. Native Convex is accepted only
+for GARFEX-owned compatible local/development clients; it is not public or third-party exposure. This decision
+does not copy or redefine UI architecture; it constrains what the backend may publish or consume.
 
 ## Repository topology
 
@@ -63,8 +64,8 @@ copying, linking, or mounting Surface source into `garfex-platform` while this d
 
 This decision intentionally does not choose or implement:
 
-- transport or protocol representation;
-- a public SDK, package registry, contract generation, or generated bindings;
+- HTTP or another additional transport beyond the accepted native local/development adapter;
+- a public SDK, package registry, or publication path;
 - external schemas or their versioning mechanism;
 - consumer-specific workflows or external operations beyond the canonical GARFEX contract;
 - productive authentication changes; or
