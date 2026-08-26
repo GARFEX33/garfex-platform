@@ -27,6 +27,10 @@ const externalBoundaryRules = [
   "external-no-generic-business-executor",
   "external-no-automatic-derivation",
   "external-no-transport",
+  "external-no-automatic-publication",
+  "external-contract-stale-metadata",
+  "external-contract-final-authorization",
+  "external-contract-exact-ten",
 ] as const;
 
 const focusedExternalBoundaryFixtures = [
@@ -37,6 +41,10 @@ const focusedExternalBoundaryFixtures = [
   ["generic-executor.ts", "external-no-generic-business-executor", "trusted"],
   ["automatic-derivation.ts", "external-no-automatic-derivation", "client-facing"],
   ["transport-import.ts", "external-no-transport", "trusted"],
+  ["automatic-publication.ts", "external-no-automatic-publication", "trusted"],
+  ["stale-metadata.json", "external-contract-stale-metadata", "artifacts"],
+  ["missing-final-authorization.ts", "external-contract-final-authorization", "trusted"],
+  ["wrong-operation-count.tsp", "external-contract-exact-ten", "contracts"],
 ] as const;
 
 const outputOf = (result: ReturnType<typeof spawnSync>) =>
@@ -102,6 +110,14 @@ describe("architecture fitness functions", () => {
     expect(output).toContain("external-client-boundary/yarn.lock");
   });
 
+  it("inspects the complete TypeSpec-to-documentation contract fixture", () => {
+    const result = checkTarget("tooling/architecture-fixtures/valid/external-garfex-boundary");
+    const output = outputOf(result);
+
+    expect(result.status, output).toBe(0);
+    expect(output).toContain("architecture check passed");
+  });
+
   it("accepts independent contract and trusted public-edge fixtures", () => {
     const result = checkTarget("tooling/architecture-fixtures/valid/external-garfex-boundary");
     const output = outputOf(result);
@@ -119,12 +135,39 @@ describe("architecture fitness functions", () => {
         `tooling/architecture-fixtures/violations/external-garfex-boundary/${layer}/${file}`,
       );
       const output = outputOf(result);
-      const reportedRules = externalBoundaryRules.filter((rule) =>
-        output.includes(`error ${rule}:`),
-      );
+      const reportedRules = [
+        ...new Set([...output.matchAll(/^error ([^:]+):/gm)].map((match) => match[1])),
+      ];
 
       expect(result.status, `${file}: ${output}`).toBe(1);
       expect(reportedRules, `${file}: ${output}`).toEqual([expectedRule]);
+    }
+  }, 30_000);
+
+  it("does not inspect the protected persistent catalog change", () => {
+    const result = checkTarget("openspec/changes/persistent-resource-catalog");
+    const output = outputOf(result);
+
+    expect(result.status, output).toBe(0);
+    expect(output).toContain("architecture check passed");
+  });
+
+  it("does not treat manifest JSON content as transport selection", () => {
+    const temporaryRoot = mkdtempSync(join(root, "tooling/architecture-manifest-"));
+    try {
+      writeFileSync(
+        join(temporaryRoot, "semantic-manifest.json"),
+        JSON.stringify({
+          externalContractIdentity: "garfex.resource-master.external-client-contract",
+          compatibilityRevision: "1",
+          protocol: "transport-neutral semantic evidence",
+          route: "not-a-selected-transport",
+        }),
+      );
+      const result = checkTarget(temporaryRoot);
+      expect(result.status, outputOf(result)).toBe(0);
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true });
     }
   });
 

@@ -1,49 +1,35 @@
 import type { ActorContext, ResourceMaster, Result } from "../../resource-master/public.js";
 import type {
+  ExternalDescribeResourceRequest,
   ExternalFailure,
+  ExternalGetEffectiveResourceSchemaRequest,
+  ExternalGetNaturalUnitsRequest,
+  ExternalGetResourceRequest,
+  ExternalGetValidOptionsRequest,
   ExternalOperation,
   ExternalOutcome,
+  ExternalRequest,
+  ExternalSearchResourcesRequest,
+  ExternalSuccess,
 } from "../client-facing/contract.js";
 import {
-  validateExternalFailure,
-  validateExternalGetEffectiveResourceSchemaRequest,
-  validateExternalGetEffectiveResourceSchemaSuccess,
-  validateExternalGetNaturalUnitsRequest,
-  validateExternalGetNaturalUnitsSuccess,
-  validateExternalGetResourceRequest,
-  validateExternalGetResourceSuccess,
-  validateExternalSearchResourcesRequest,
-  validateExternalSearchResourcesSuccess,
-  validateExternalGetTaxonomyRequest,
-  validateExternalGetTaxonomySuccess,
-  validateExternalGetValidOptionsRequest,
-  validateExternalGetValidOptionsSuccess,
-  validateExternalDescribeResourceRequest,
-  validateExternalDescribeResourceSuccess,
-} from "../client-facing/validation.js";
-import {
+  type ExternalBoundaryDiagnostics,
   normalizeResourceError,
   normalizeThrownError,
-  type ExternalBoundaryDiagnostics,
 } from "./errors.js";
-import type { TrustedActorResolver } from "./identity.js";
 import {
+  projectExternalDescribeResource,
   projectExternalGetEffectiveResourceSchema,
   projectExternalGetNaturalUnits,
   projectExternalGetResource,
-  projectExternalSearchResources,
   projectExternalGetTaxonomy,
   projectExternalGetValidOptions,
-  projectExternalDescribeResource,
+  projectExternalSearchResources,
 } from "./projections.js";
 
-type ReadDependencies = {
-  readonly actorResolver: TrustedActorResolver;
-  readonly resourceMaster: ResourceMaster;
-  readonly diagnostics?: ExternalBoundaryDiagnostics;
-};
-type SuccessValidator<T> = (value: unknown) => T | ExternalFailure;
-type ProjectedOutcome<T> = { readonly ok: true; readonly value: T } | ExternalFailure;
+type ReadResult<Operation extends ExternalOperation> = ExternalOutcome<Operation>;
+type ReadRequest<Operation extends ExternalOperation> = ExternalRequest<Operation>;
+type ReadSuccess<Operation extends ExternalOperation> = ExternalSuccess<Operation>;
 
 function isFailure(value: unknown): value is ExternalFailure {
   try {
@@ -54,240 +40,165 @@ function isFailure(value: unknown): value is ExternalFailure {
 }
 
 function checkedFailure(value: ExternalFailure): ExternalFailure {
-  return validateExternalFailure(value);
-}
-
-async function trustedActor(
-  resolver: TrustedActorResolver,
-): Promise<ActorContext | ExternalFailure> {
-  try {
-    const actor = await resolver.resolveActor();
-    if (actor !== null) return actor;
-  } catch {
-    // Authentication failures are intentionally indistinguishable at this edge.
-  }
-  return checkedFailure({ ok: false, error: { code: "UNAUTHENTICATED" } });
+  return value;
 }
 
 function applicationValue<T>(result: Result<T>): T | ExternalFailure {
   try {
     if (result.ok === false) return checkedFailure(normalizeResourceError(result.error));
-    if (result.ok !== true)
-      return checkedFailure({ ok: false, error: { code: "INTERNAL_FAILURE" } });
+    if (result.ok !== true) return { ok: false, error: { code: "INTERNAL_FAILURE" } };
     return result.value;
   } catch {
-    return checkedFailure({ ok: false, error: { code: "INTERNAL_FAILURE" } });
+    return { ok: false, error: { code: "INTERNAL_FAILURE" } };
   }
 }
 
-function completeReadOutcome<Input, Output>(
-  operation: ExternalOperation,
-  result: Result<Input>,
-  project: (value: Input) => unknown,
-  validate: SuccessValidator<Output>,
+async function completeReadOutcome<Operation extends ExternalOperation, Input>(
+  operation: Operation,
+  invoke: () => Promise<Result<Input>>,
+  project: (value: Input) => ReadSuccess<Operation>,
   diagnostics?: ExternalBoundaryDiagnostics,
-): ProjectedOutcome<Output> {
+): Promise<ReadResult<Operation>> {
+  let result: Result<Input>;
+  try {
+    result = await invoke();
+  } catch (cause) {
+    return checkedFailure(normalizeThrownError(operation, "invocation", cause, diagnostics));
+  }
+
   const value = applicationValue(result);
   if (isFailure(value)) return value;
+
   try {
-    const validated = validate(project(value));
-    return isFailure(validated)
-      ? checkedFailure(
-          normalizeThrownError(operation, "response-validation", validated, diagnostics),
-        )
-      : { ok: true, value: validated };
+    return { ok: true, value: project(value) };
   } catch (cause) {
     return checkedFailure(normalizeThrownError(operation, "projection", cause, diagnostics));
   }
 }
 
-export async function invokeExternalGetTaxonomy(
-  rawRequest: unknown,
-  { actorResolver, resourceMaster, diagnostics }: ReadDependencies,
-): Promise<ExternalOutcome<"getTaxonomy">> {
-  const request = validateExternalGetTaxonomyRequest(rawRequest);
-  if (isFailure(request)) return checkedFailure(request);
-  const actor = await trustedActor(actorResolver);
-  if (isFailure(actor)) return actor;
-
-  let result: Awaited<ReturnType<ResourceMaster["getTaxonomy"]>>;
-  try {
-    result = await resourceMaster.getTaxonomy(actor);
-  } catch (cause) {
-    return checkedFailure(normalizeThrownError("getTaxonomy", "invocation", cause, diagnostics));
-  }
+export async function handleGetTaxonomy(
+  _input: ReadRequest<"getTaxonomy">,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ReadResult<"getTaxonomy">> {
   return completeReadOutcome(
     "getTaxonomy",
-    result,
+    () => resourceMaster.getTaxonomy(actor),
     projectExternalGetTaxonomy,
-    validateExternalGetTaxonomySuccess,
     diagnostics,
   );
 }
 
-export async function invokeExternalGetEffectiveResourceSchema(
-  rawRequest: unknown,
-  { actorResolver, resourceMaster, diagnostics }: ReadDependencies,
-): Promise<ExternalOutcome<"getEffectiveResourceSchema">> {
-  const request = validateExternalGetEffectiveResourceSchemaRequest(rawRequest);
-  if (isFailure(request)) return checkedFailure(request);
-  const actor = await trustedActor(actorResolver);
-  if (isFailure(actor)) return actor;
-
-  let result: Awaited<ReturnType<ResourceMaster["getEffectiveResourceSchema"]>>;
-  try {
-    result = await resourceMaster.getEffectiveResourceSchema(actor, {
-      classCode: request.classCode,
-      familyCode: request.familyCode,
-      typeCode: request.typeCode,
-    });
-  } catch (cause) {
-    return checkedFailure(
-      normalizeThrownError("getEffectiveResourceSchema", "invocation", cause, diagnostics),
-    );
-  }
+export async function handleGetEffectiveResourceSchema(
+  input: ExternalGetEffectiveResourceSchemaRequest,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ReadResult<"getEffectiveResourceSchema">> {
+  const moduleInput: Parameters<ResourceMaster["getEffectiveResourceSchema"]>[1] = {
+    classCode: input.classCode,
+    familyCode: input.familyCode,
+    typeCode: input.typeCode,
+  };
   return completeReadOutcome(
     "getEffectiveResourceSchema",
-    result,
+    () => resourceMaster.getEffectiveResourceSchema(actor, moduleInput),
     projectExternalGetEffectiveResourceSchema,
-    validateExternalGetEffectiveResourceSchemaSuccess,
     diagnostics,
   );
 }
 
-export async function invokeExternalGetValidOptions(
-  rawRequest: unknown,
-  { actorResolver, resourceMaster, diagnostics }: ReadDependencies,
-): Promise<ExternalOutcome<"getValidOptions">> {
-  const request = validateExternalGetValidOptionsRequest(rawRequest);
-  if (isFailure(request)) return checkedFailure(request);
-  const actor = await trustedActor(actorResolver);
-  if (isFailure(actor)) return actor;
-
-  let result: Awaited<ReturnType<ResourceMaster["getValidOptions"]>>;
-  try {
-    result = await resourceMaster.getValidOptions(actor, { attributeCode: request.attributeCode });
-  } catch (cause) {
-    return checkedFailure(
-      normalizeThrownError("getValidOptions", "invocation", cause, diagnostics),
-    );
-  }
+export async function handleGetValidOptions(
+  input: ExternalGetValidOptionsRequest,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ReadResult<"getValidOptions">> {
+  const moduleInput: Parameters<ResourceMaster["getValidOptions"]>[1] = {
+    attributeCode: input.attributeCode,
+  };
   return completeReadOutcome(
     "getValidOptions",
-    result,
+    () => resourceMaster.getValidOptions(actor, moduleInput),
     projectExternalGetValidOptions,
-    validateExternalGetValidOptionsSuccess,
     diagnostics,
   );
 }
 
-export async function invokeExternalGetNaturalUnits(
-  rawRequest: unknown,
-  { actorResolver, resourceMaster, diagnostics }: ReadDependencies,
-): Promise<ExternalOutcome<"getNaturalUnits">> {
-  const request = validateExternalGetNaturalUnitsRequest(rawRequest);
-  if (isFailure(request)) return checkedFailure(request);
-  const actor = await trustedActor(actorResolver);
-  if (isFailure(actor)) return actor;
-
-  let result: Awaited<ReturnType<ResourceMaster["getNaturalUnits"]>>;
-  try {
-    result = await resourceMaster.getNaturalUnits(actor, { familyCode: request.familyCode });
-  } catch (cause) {
-    return checkedFailure(
-      normalizeThrownError("getNaturalUnits", "invocation", cause, diagnostics),
-    );
-  }
+export async function handleGetNaturalUnits(
+  input: ExternalGetNaturalUnitsRequest,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ReadResult<"getNaturalUnits">> {
+  const moduleInput: Parameters<ResourceMaster["getNaturalUnits"]>[1] = {
+    familyCode: input.familyCode,
+  };
   return completeReadOutcome(
     "getNaturalUnits",
-    result,
+    () => resourceMaster.getNaturalUnits(actor, moduleInput),
     projectExternalGetNaturalUnits,
-    validateExternalGetNaturalUnitsSuccess,
     diagnostics,
   );
 }
 
-export async function invokeExternalGetResource(
-  rawRequest: unknown,
-  { actorResolver, resourceMaster, diagnostics }: ReadDependencies,
-): Promise<ExternalOutcome<"getResource">> {
-  const request = validateExternalGetResourceRequest(rawRequest);
-  if (isFailure(request)) return checkedFailure(request);
-  const actor = await trustedActor(actorResolver);
-  if (isFailure(actor)) return actor;
-
-  let result: Awaited<ReturnType<ResourceMaster["getResource"]>>;
-  try {
-    result = await resourceMaster.getResource(actor, { resourceId: request.resourceId });
-  } catch (cause) {
-    return checkedFailure(normalizeThrownError("getResource", "invocation", cause, diagnostics));
-  }
+export async function handleGetResource(
+  input: ExternalGetResourceRequest,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ReadResult<"getResource">> {
+  const moduleInput: Parameters<ResourceMaster["getResource"]>[1] = {
+    resourceId: input.resourceId,
+  };
   return completeReadOutcome(
     "getResource",
-    result,
+    () => resourceMaster.getResource(actor, moduleInput),
     projectExternalGetResource,
-    validateExternalGetResourceSuccess,
     diagnostics,
   );
 }
 
-export async function invokeExternalSearchResources(
-  rawRequest: unknown,
-  { actorResolver, resourceMaster, diagnostics }: ReadDependencies,
-): Promise<ExternalOutcome<"searchResources">> {
-  const request = validateExternalSearchResourcesRequest(rawRequest);
-  if (isFailure(request)) return checkedFailure(request);
-  const actor = await trustedActor(actorResolver);
-  if (isFailure(actor)) return actor;
-
-  const input: Parameters<ResourceMaster["searchResources"]>[1] = {
-    terms: request.terms,
-    ...(request.lifecycle === undefined ? {} : { lifecycle: request.lifecycle }),
-    ...(request.limit === undefined ? {} : { limit: request.limit }),
-    ...(request.cursor === undefined ? {} : { cursor: request.cursor }),
+export async function handleSearchResources(
+  input: ExternalSearchResourcesRequest,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ReadResult<"searchResources">> {
+  type SearchModuleInput = {
+    -readonly [Key in keyof Parameters<ResourceMaster["searchResources"]>[1]]: Parameters<
+      ResourceMaster["searchResources"]
+    >[1][Key];
   };
+  const moduleInput: SearchModuleInput = {
+    terms: input.terms,
+  };
+  if (input.lifecycle !== undefined) moduleInput.lifecycle = input.lifecycle;
+  if (input.limit !== undefined) moduleInput.limit = input.limit;
+  if (input.cursor !== undefined) moduleInput.cursor = input.cursor;
 
-  let result: Awaited<ReturnType<ResourceMaster["searchResources"]>>;
-  try {
-    result = await resourceMaster.searchResources(actor, input);
-  } catch (cause) {
-    return checkedFailure(
-      normalizeThrownError("searchResources", "invocation", cause, diagnostics),
-    );
-  }
   return completeReadOutcome(
     "searchResources",
-    result,
+    () => resourceMaster.searchResources(actor, moduleInput),
     projectExternalSearchResources,
-    validateExternalSearchResourcesSuccess,
     diagnostics,
   );
 }
 
-export async function invokeExternalDescribeResource(
-  rawRequest: unknown,
-  { actorResolver, resourceMaster, diagnostics }: ReadDependencies,
-): Promise<ExternalOutcome<"describeResource">> {
-  const request = validateExternalDescribeResourceRequest(rawRequest);
-  if (isFailure(request)) return checkedFailure(request);
-  const actor = await trustedActor(actorResolver);
-  if (isFailure(actor)) return actor;
-
-  let result: Awaited<ReturnType<ResourceMaster["describeResource"]>>;
-  try {
-    result = await resourceMaster.describeResource(actor, {
-      resourceId: request.resourceId,
-    });
-  } catch (cause) {
-    return checkedFailure(
-      normalizeThrownError("describeResource", "invocation", cause, diagnostics),
-    );
-  }
+export async function handleDescribeResource(
+  input: ExternalDescribeResourceRequest,
+  actor: ActorContext,
+  resourceMaster: ResourceMaster,
+  diagnostics?: ExternalBoundaryDiagnostics,
+): Promise<ReadResult<"describeResource">> {
+  const moduleInput: Parameters<ResourceMaster["describeResource"]>[1] = {
+    resourceId: input.resourceId,
+  };
   return completeReadOutcome(
     "describeResource",
-    result,
+    () => resourceMaster.describeResource(actor, moduleInput),
     projectExternalDescribeResource,
-    validateExternalDescribeResourceSuccess,
     diagnostics,
   );
 }

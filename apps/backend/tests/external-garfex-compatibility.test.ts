@@ -1,19 +1,51 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import {
-  externalErrorCodes,
-  externalOperationIdentifiers,
-  type ExternalOperation,
-} from "../src/external-garfex-boundary/client-facing/contract.js";
+import type { ExternalOperation } from "../src/external-garfex-boundary/client-facing/contract.js";
 import * as validators from "../src/external-garfex-boundary/client-facing/validation.js";
-import type { ActorContext, ResourceMaster } from "../src/resource-master/public.js";
+import * as reads from "../src/external-garfex-boundary/composition.js";
 import * as mutations from "../src/external-garfex-boundary/trusted/mutation-operations.js";
-import * as reads from "../src/external-garfex-boundary/trusted/read-operations.js";
+import type { ActorContext, ResourceMaster } from "../src/resource-master/public.js";
 
 const fixtureUrl = new URL(
   "./fixtures/external-garfex-boundary/compatibility.json",
   import.meta.url,
 );
+const manifestUrl = new URL(
+  "../../../contracts/external-garfex/resource-master/generated/semantic-manifest.json",
+  import.meta.url,
+);
+type CompatibilityManifest = {
+  readonly enums: readonly {
+    readonly name: string;
+    readonly values: readonly (string | number)[];
+  }[];
+  readonly models: readonly {
+    readonly name: string;
+    readonly properties: readonly { readonly name: string }[];
+  }[];
+  readonly operations: readonly { readonly name: string }[];
+};
+const manifest = JSON.parse(readFileSync(manifestUrl, "utf8")) as CompatibilityManifest;
+const manifestOperations = manifest.operations.map(
+  ({ name }) => name,
+) as readonly ExternalOperation[];
+const manifestFailureCodes = (
+  manifest.enums.find(({ name }) => name === "ExternalFailureCode")?.values ?? []
+).map(String);
+const modelNameFromFailureCode = (code: string): string => {
+  const parts = code.toLowerCase().split("_");
+  const modelParts = parts.at(-1) === "failure" ? parts.slice(0, -1) : parts;
+  return `${modelParts.map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("")}Failure`;
+};
+const manifestMatrixKeys = Object.fromEntries(
+  manifestFailureCodes.map((code) => {
+    const failureModel = manifest.models.find(
+      ({ name }) => name === modelNameFromFailureCode(code),
+    );
+    if (failureModel === undefined) throw new Error(`manifest has no failure model for ${code}`);
+    return [code, failureModel.properties.map(({ name }) => name)];
+  }),
+) as Record<string, readonly string[]>;
 type Validator = (value: unknown) => unknown;
 type Dependencies = {
   readonly actorResolver: { resolveActor: () => Promise<ActorContext> };
@@ -154,30 +186,17 @@ function expectOnlyNamedMethod(
   }
 }
 
-const matrixKeys: Record<string, readonly string[]> = {
-  UNAUTHENTICATED: ["code"],
-  FORBIDDEN: ["code"],
-  INVALID_ARGUMENT: ["code", "fieldIssues"],
-  INVALID_REFERENCE: ["code", "fieldIssues"],
-  VALIDATION_FAILED: ["code", "fieldIssues"],
-  NOT_FOUND: ["code"],
-  DUPLICATE: ["code", "existingResourceId"],
-  CONFLICT: ["code", "currentRevision"],
-  INVALID_LIFECYCLE: ["code"],
-  CATALOG_UNAVAILABLE: ["code"],
-  INTERNAL_FAILURE: ["code"],
-};
-
-describe("external GARFEX serialized compatibility", () => {
+describe("external GARFEX semantic compatibility evidence", () => {
   it("loads ten closed operation entries and validates every fixture shape", () => {
     const fixture = loadFixture();
+    expect(fixture.evidenceKind).toBe("semantic-compatibility");
     const entries = record(fixture.operations);
-    expect(Object.keys(entries)).toEqual([...externalOperationIdentifiers]);
+    expect(Object.keys(entries)).toEqual([...manifestOperations]);
     expect(validators.parseExternalOperationIdentifier("futureOperation")).toMatchObject({
       ok: false,
       error: { code: "INVALID_ARGUMENT" },
     });
-    for (const operation of externalOperationIdentifiers) {
+    for (const operation of manifestOperations) {
       const entry = record(entries[operation]);
       expect(cases[operation][0](entry.request)).toEqual(entry.request);
       expect(cases[operation][1](entry.success)).toEqual(entry.success);
@@ -201,11 +220,11 @@ describe("external GARFEX serialized compatibility", () => {
 
   it("freezes the complete eleven-code metadata matrix", () => {
     const matrix = record(loadFixture().errorMatrix);
-    expect(Object.keys(matrix)).toEqual([...externalErrorCodes]);
-    for (const code of externalErrorCodes) {
+    expect(Object.keys(matrix).sort()).toEqual([...manifestFailureCodes].sort());
+    for (const code of manifestFailureCodes) {
       const failure = matrix[code];
       expect(validators.validateExternalFailure(failure)).toEqual(failure);
-      expect(Object.keys(record(record(failure).error))).toEqual(matrixKeys[code]);
+      expect(Object.keys(record(record(failure).error))).toEqual(manifestMatrixKeys[code]);
     }
   });
 
@@ -220,7 +239,7 @@ describe("external GARFEX serialized compatibility", () => {
     expect(serialized(finalPage)).toEqual(finalPage);
   });
 
-  it.each(externalOperationIdentifiers)(
+  it.each(manifestOperations)(
     "%s fixture drives its named stub and deep-compares serialized success/failure",
     async (operation) => {
       const entry = record(record(loadFixture().operations)[operation]);

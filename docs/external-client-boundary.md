@@ -73,6 +73,28 @@ This decision intentionally does not choose or implement:
 These require explicit later decisions. None is implied by calling the UI a GARFEX client, and the
 canonical semantic boundary creates no network reachability.
 
+## Canonical contract decision
+
+GARFEX owns the external semantic authority in [`contracts/external-garfex/resource-master/`](../contracts/external-garfex/resource-master/).
+TypeSpec produces the semantic manifest, which is materialized as [standalone consumer semantics](./generated/resource-master-external-contract.md)
+and compared with the accepted [baseline](../contracts/external-garfex/resource-master/baseline/accepted-semantic-manifest.json).
+Stale-artifact and breaking-change gates must pass before acceptance or publication; the compatibility fixture is evidence only.
+
+The exact external-to-module mappings are `getTaxonomy`, `getEffectiveResourceSchema`, `getValidOptions`,
+`getNaturalUnits`, `getResource`, `searchResources`, `describeResource`, `createResource`,
+`updateNonIdentityData`, and `deactivateResource`, each mapping only to the identically named Resource Master
+operation. Their final capabilities are respectively `resource:read` for the first seven, `resource:create`,
+`resource:update-non-identity`, and `resource:deactivate`. The complete safe error set is
+`UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_ARGUMENT`, `INVALID_REFERENCE`, `VALIDATION_FAILED`, `NOT_FOUND`,
+`DUPLICATE`, `CONFLICT`, `INVALID_LIFECYCLE`, `CATALOG_UNAVAILABLE`, and `INTERNAL_FAILURE`; only applicable
+`fieldIssues`, `existingResourceId`, and `currentRevision` metadata may cross the boundary.
+
+TypeSpec owns external meaning, the trusted edge owns fresh trusted actor construction and explicit mapping,
+projection, and normalization, and Resource Master owns final authorization. Convex remains encapsulated behind
+Resource Master ports. Revision `1` is opaque and compared only for exact equality; no version-policy mechanics are selected.
+
+Related records: [GARFEX boundary](./external-garfex-boundary.md), [authentication boundary](./auth-boundary.md), and [architecture](./architecture.md).
+
 ## Relationship to other decisions
 
 The accepted [Surface/UI and Harness boundary](./surface-ui-harness-boundary.md) remains unchanged:

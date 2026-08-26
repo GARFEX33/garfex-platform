@@ -1,0 +1,3 @@
+entrypoint: main.tsp
+emitters:
+  ./semantic-manifest-emitter: {}

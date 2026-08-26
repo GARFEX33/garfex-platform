@@ -145,6 +145,28 @@ corepack pnpm exec biome format docs/external-garfex-boundary.md docs/architectu
 corepack pnpm exec biome lint apps/backend/tests/external-garfex-documentation-parity.test.ts
 ```
 
+## Contract tooling gates
+
+The focused root commands are non-writing except for the explicit generation command:
+
+```text
+corepack pnpm contract:typespec:check
+corepack pnpm contract:check
+corepack pnpm contract:generate
+```
+
+`contract:check` compiles TypeSpec without an emitter, generates into a cleaned temporary directory,
+then checks manifest schema/bytes, materializer parity, accepted-baseline coupling, and stale digests.
+It does not modify committed artifacts or the protected catalog. The complete repository gate is:
+
+```text
+corepack pnpm check
+```
+
+The root gate invokes the non-writing contract check before formatting, lint, typecheck, tests,
+architecture checks, and build. No command publishes clients, deploys, selects a transport, or changes
+Resource Master behavior.
+
 ## Convex encapsulation
 
 Convex remains a private infrastructure and platform adapter behind Resource Master application-owned
@@ -181,6 +203,21 @@ consumer-behavior
 
 These open decisions preserve the distinction between semantic compatibility ownership and a future
 transport or product integration.
+
+## Decision links and gates
+
+TypeSpec at [`contracts/external-garfex/resource-master/`](../contracts/external-garfex/resource-master/)
+is the GARFEX-owned external semantic authority. Its generated
+[`semantic-manifest.json`](../contracts/external-garfex/resource-master/generated/semantic-manifest.json)
+feeds the generated [consumer semantics](./generated/resource-master-external-contract.md), the accepted
+[`accepted-semantic-manifest.json`](../contracts/external-garfex/resource-master/baseline/accepted-semantic-manifest.json),
+and the compatibility fixture. The stale-artifact and breaking-change gates reject drift, stale outputs,
+and unapproved breaking changes before acceptance or publication.
+
+The three boundaries are deliberately distinct: TypeSpec owns client-safe meaning; the trusted edge owns
+validation, authentication composition, fresh actor construction, named mapping, projection, and failure
+normalization; Resource Master owns the in-process actor-first contract and final deny-by-default capability
+authorization. Convex remains private infrastructure behind Resource Master application-owned ports.
 
 ## Linked boundary records
 

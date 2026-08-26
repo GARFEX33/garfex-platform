@@ -161,6 +161,16 @@ node tooling/architecture/check.mjs tooling/architecture-fixtures/violations
 
 That command must exit `1` with named rules; the default valid/current graph must exit `0`.
 
+## External contract decision
+
+TypeSpec is the GARFEX-owned external semantic authority at [`contracts/external-garfex/resource-master/`](../contracts/external-garfex/resource-master/). The generated [consumer semantics](./generated/resource-master-external-contract.md), semantic manifest, and [accepted baseline](../contracts/external-garfex/resource-master/baseline/accepted-semantic-manifest.json) are downstream evidence checked by documentation parity, stale-artifact, and breaking-change gates.
+
+The external surface is exactly `getTaxonomy`, `getEffectiveResourceSchema`, `getValidOptions`, `getNaturalUnits`, `getResource`, `searchResources`, `describeResource`, `createResource`, `updateNonIdentityData`, and `deactivateResource`. Each maps one-to-one to the identically named Resource Master operation: the first seven require `resource:read`, followed by `resource:create`, `resource:update-non-identity`, and `resource:deactivate`. The safe failure codes are `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_ARGUMENT`, `INVALID_REFERENCE`, `VALIDATION_FAILED`, `NOT_FOUND`, `DUPLICATE`, `CONFLICT`, `INVALID_LIFECYCLE`, `CATALOG_UNAVAILABLE`, and `INTERNAL_FAILURE`; only applicable `fieldIssues`, `existingResourceId`, and `currentRevision` metadata are public.
+
+The three boundaries remain separate: TypeSpec owns client-safe semantics; the trusted edge validates, authenticates, constructs a fresh actor, maps named operations, projects fields, and normalizes safe errors; Resource Master owns the actor-first application contract and final deny-by-default authorization. Convex remains private infrastructure behind application-owned ports. Revision `1` is opaque and compared exactly. These records preserve open transport, HTTP/wire authentication, OpenAPI, Scalar, Orval, SDK/publication, productive identity, UI, and version-policy decisions.
+
+Related records: [GARFEX boundary](./external-garfex-boundary.md), [external client boundary](./external-client-boundary.md), and [authentication boundary](./auth-boundary.md).
+
 ## Shape for future modules
 
 Add a module only when a real capability exists, and give it the same ownership shape:

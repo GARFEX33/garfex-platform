@@ -8,6 +8,7 @@
       "apps/**",
       "!apps/**/.convex",
       "!apps/**/dist",
+      "!apps/**/external-garfex-boundary/client-facing/generated",
       "!apps/**/convex/_generated",
       ".github/**",
       "README.md",

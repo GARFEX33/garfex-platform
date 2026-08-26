@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  externalErrorCodes,
-  externalOperationIdentifiers,
   type ExternalAttributeValue,
   type ExternalError,
   type ExternalFailure,
@@ -9,6 +7,8 @@ import {
   type ExternalOutcome,
   type ExternalRequests,
   type ExternalSuccesses,
+  externalErrorCodes,
+  externalOperationIdentifiers,
 } from "../src/external-garfex-boundary/client-facing/contract.js";
 import {
   parseExternalOperationIdentifier,
@@ -18,6 +18,7 @@ import {
   validateExternalDeactivateResourceSuccess,
   validateExternalDescribeResourceRequest,
   validateExternalDescribeResourceSuccess,
+  validateExternalFailure,
   validateExternalGetEffectiveResourceSchemaRequest,
   validateExternalGetEffectiveResourceSchemaSuccess,
   validateExternalGetNaturalUnitsRequest,
@@ -30,7 +31,6 @@ import {
   validateExternalGetValidOptionsSuccess,
   validateExternalSearchResourcesRequest,
   validateExternalSearchResourcesSuccess,
-  validateExternalFailure,
   validateExternalUpdateNonIdentityDataRequest,
   validateExternalUpdateNonIdentityDataSuccess,
 } from "../src/external-garfex-boundary/client-facing/validation.js";
@@ -659,6 +659,87 @@ describe("external GARFEX client-facing contract", () => {
       expect(result).toEqual([{ code: "hardware", name: "Hardware", families: [] }]);
       if (!Array.isArray(result)) return;
       expect(result[0]).not.toBe(entry);
+    });
+
+    it("contains symbols, accessors, sparse arrays, and hostile attribute keys", () => {
+      const symbol = Symbol("provider-secret");
+      const symbolRequest = {
+        resourceId: "resource-1",
+        [symbol]: "secret",
+      };
+      expectInvalid(validateExternalGetResourceRequest(symbolRequest));
+
+      const throwingRequest = {
+        get resourceId(): never {
+          throw new Error("identity getter secret");
+        },
+      };
+      expectInvalid(validateExternalGetResourceRequest(throwingRequest));
+
+      const sparse = new Array(1);
+      expectInternalFailure(validateExternalGetValidOptionsSuccess(sparse));
+
+      const extended = Object.assign([{ code: "bare", label: "Bare" }], {
+        internalField: "secret",
+        [symbol]: "secret",
+      });
+      expectInternalFailure(validateExternalGetValidOptionsSuccess(extended));
+
+      const throwingItem = [] as unknown[];
+      Object.defineProperty(throwingItem, "0", {
+        configurable: true,
+        enumerable: true,
+        get: () => {
+          throw new Error("option getter secret");
+        },
+      });
+      throwingItem.length = 1;
+      expectInternalFailure(validateExternalGetValidOptionsSuccess(throwingItem));
+
+      for (const key of [
+        "__proto__",
+        "constructor",
+        "prototype",
+        "actorId",
+        "capability",
+        "resourceId",
+      ]) {
+        const attributes = Object.create(null) as Record<string, unknown>;
+        Object.defineProperty(attributes, key, {
+          configurable: true,
+          enumerable: true,
+          value: "forged",
+        });
+        expectInvalid(
+          validateExternalCreateResourceRequest({
+            classCode: "hardware",
+            familyCode: "wire",
+            typeCode: "solid-wire",
+            naturalUnitCode: "meter",
+            attributes,
+          }),
+          `attributes.${key}`,
+        );
+      }
+
+      const attributeGetter = Object.create(null) as Record<string, unknown>;
+      Object.defineProperty(attributeGetter, "finish", {
+        configurable: true,
+        enumerable: true,
+        get: () => {
+          throw new Error("attribute getter secret");
+        },
+      });
+      expectInvalid(
+        validateExternalCreateResourceRequest({
+          classCode: "hardware",
+          familyCode: "wire",
+          typeCode: "solid-wire",
+          naturalUnitCode: "meter",
+          attributes: attributeGetter,
+        }),
+        "attributes.finish",
+      );
     });
   });
 

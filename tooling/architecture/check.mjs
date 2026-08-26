@@ -20,7 +20,7 @@ const ignoredDirectories = new Set([
   "dist",
   "node_modules",
 ]);
-const sourceExtension = /\.[cm]?[jt]sx?$/;
+const sourceExtension = /\.[cm]?[jt]sx?$|\.tsp$/;
 const dependencyFields = [
   "dependencies",
   "devDependencies",
@@ -168,11 +168,32 @@ const isBannedCoreDependency = (path) =>
   /(?:^|\/)convex\//.test(path) ||
   /(?:^|\/)_generated\//.test(path) ||
   /(?:^|\/)(?:infrastructure|deployment|ui|http|agents?)\//.test(path);
-const isExternalBoundarySource = (path) => /(?:^|\/)external-garfex-boundary\//.test(path);
-const isExternalClientContractSource = (path) =>
-  /(?:^|\/)external-garfex-boundary\/client-facing\//.test(path);
-const isExternalTrustedEdgeSource = (path) =>
-  /(?:^|\/)external-garfex-boundary\/trusted\//.test(path);
+const EXTERNAL_RULE = Object.freeze({
+  independent: "external-contract-independent",
+  authority: "external-contract-no-authority",
+  platform: "external-contract-no-platform",
+  trustedPublicOnly: "external-trusted-edge-public-only",
+  genericExecutor: "external-no-generic-business-executor",
+  derivation: "external-no-automatic-derivation",
+  transport: "external-no-transport",
+  publication: "external-no-automatic-publication",
+  staleMetadata: "external-contract-stale-metadata",
+  finalAuthorization: "external-contract-final-authorization",
+  exactTen: "external-contract-exact-ten",
+});
+const classifyPath = (path) => {
+  const normalized = normalize(path);
+  return {
+    externalBoundary: /(?:^|\/)external-garfex-boundary\//.test(normalized),
+    externalClient: /(?:^|\/)external-garfex-boundary\/client-facing\//.test(normalized),
+    externalTrusted: /(?:^|\/)external-garfex-boundary\/trusted\//.test(normalized),
+  };
+};
+const isExternalBoundarySource = (path) => classifyPath(path).externalBoundary;
+const isExternalClientContractSource = (path) => classifyPath(path).externalClient;
+const isExternalTrustedEdgeSource = (path) => classifyPath(path).externalTrusted;
+const isProtectedInspectionPath = (path) =>
+  /(?:^|\/)openspec\/changes\/persistent-resource-catalog(?:\/|$)/.test(normalize(path));
 const isExternalCompatibilityFixture = (path) =>
   /(?:^|\/)apps\/backend\/tests\/fixtures\/external-garfex-boundary\//.test(path);
 const isExternalContractInternalImport = (specifier) =>
@@ -212,6 +233,32 @@ const hasExternalGenericBusinessSurface = (source) =>
   ) ||
   /\b(?:operationHandlers|operationMap|operationRegistry|handlerRegistry)\b/.test(source) ||
   /\b(?:Object\.(?:keys|values|entries)|Reflect\.ownKeys)\s*\(\s*resourceMaster\b/.test(source);
+const externalOperationNames = [
+  "getTaxonomy",
+  "getEffectiveResourceSchema",
+  "getValidOptions",
+  "getNaturalUnits",
+  "getResource",
+  "searchResources",
+  "describeResource",
+  "createResource",
+  "updateNonIdentityData",
+  "deactivateResource",
+];
+const externalContractIdentity = "garfex.resource-master.external-client-contract";
+const externalCompatibilityRevision = "1";
+const isApprovedGeneratedContractImport = (specifier) =>
+  /(?:^|[/\\])(?:external-garfex-boundary[/\\]client-facing[/\\])?generated[/\\]semantic-contract\.generated(?:\.[cm]?[jt]s)?$/.test(
+    specifier,
+  );
+const hasAutomaticPublication = (source) =>
+  /\b(?:publish|publishClient|publishSdk|publishPackage|registerClient|releaseClient|exportClient)\b/i.test(
+    source,
+  ) && /\b(?:automatic|auto|registry|publication|distribution|sdk|package)\b/i.test(source);
+const hasFinalAuthorizationEvidence = (source) =>
+  /(?:final\s+authorization|deny[- ]by[- ]default|resource:read|resource:create|resource:update-non-identity|resource:deactivate)/i.test(
+    source,
+  );
 const isExternalTransportImport = (specifier) =>
   /^(?:node:)?(?:http|https|http2|net|tls|server|express|fastify|hono|koa|router|rpc|grpc|trpc|convex)(?:[/:@-]|$)/i.test(
     specifier,
@@ -232,12 +279,13 @@ const importSpecifiers = (source) =>
 const stringReferencesCounterpartPackage = (source) =>
   quotedValues(source).some(targetsCounterpartPackage);
 const isForbiddenClientContractImport = (specifier) =>
-  /(?:^|\/)(?:convex|_generated|infrastructure|persistence)(?:\/|$)/i.test(specifier) ||
-  /(?:^|\/)apps\/backend\//i.test(specifier) ||
-  /(?:^|\/)resource-master\/(?:public(?:\.[cm]?[jt]s)?$|domain|application|deployment)(?:\/|$)/i.test(
-    specifier,
-  ) ||
-  /(?:^|\/)modules\/[^/]+\/public(?:\.[cm]?[jt]s)?$/i.test(specifier);
+  !isApprovedGeneratedContractImport(specifier) &&
+  (/(?:^|\/)(?:convex|_generated|infrastructure|persistence)(?:\/|$)/i.test(specifier) ||
+    /(?:^|\/)apps\/backend\//i.test(specifier) ||
+    /(?:^|\/)resource-master\/(?:public(?:\.[cm]?[jt]s)?$|domain|application|deployment)(?:\/|$)/i.test(
+      specifier,
+    ) ||
+    /(?:^|\/)modules\/[^/]+\/public(?:\.[cm]?[jt]s)?$/i.test(specifier));
 const hasTrustedAuthLeak = (source) =>
   /\b(?:ActorContext|ProviderClaims|ProviderIdentity|ProviderSubject|ConvexIdentity|SessionIdentity|Role|Capability)\b/.test(
     source,
@@ -349,6 +397,7 @@ for (const module of report.modules ?? []) {
       addViolation("convex-entrypoint-no-core-internals", from, to);
     }
     if (
+      !isExternalBoundarySource(from) &&
       !/(?:^|\/)resource-master\//.test(from) &&
       !/(?:^|\/)convex\//.test(from) &&
       !/(?:^|\/)(?:tests?|__tests__)\//.test(from) &&
@@ -397,6 +446,7 @@ for (const module of report.modules ?? []) {
 
 const scanRoots = requestedTargets.length > 0 ? targets : [root];
 const scan = (scanRoot, current = scanRoot) => {
+  if (isProtectedInspectionPath(current)) return;
   const entry = lstatSync(current);
   const from = displayPath(current);
 
@@ -467,7 +517,7 @@ const scan = (scanRoot, current = scanRoot) => {
     ) {
       addViolation("external-client-no-counterpart-source-reference", from, counterpartName);
     }
-    if (isClientFacingSource(normalize(current))) {
+    if (isClientFacingSource(normalize(current)) && !isExternalBoundarySource(from)) {
       for (const specifier of specifiers.filter(isForbiddenClientContractImport)) {
         addViolation("client-facing-no-backend-internals", from, specifier);
       }
@@ -476,37 +526,94 @@ const scan = (scanRoot, current = scanRoot) => {
       }
     }
     if (isExternalClientContractSource(from)) {
-      const internalImport = specifiers.find(isExternalContractInternalImport);
+      const internalImport = specifiers.find(
+        (specifier) =>
+          !isApprovedGeneratedContractImport(specifier) &&
+          isExternalContractInternalImport(specifier),
+      );
       if (internalImport !== undefined) {
-        addViolation("external-contract-independent", from, internalImport);
+        addViolation(EXTERNAL_RULE.independent, from, internalImport);
       }
       if (
         hasExternalAuthorityField(source) ||
         hasExternalAuthorityType(source) ||
         specifiers.some((specifier) => /(?:^|\/)(?:auth|authorization)(?:\/|$)/i.test(specifier))
       ) {
-        addViolation("external-contract-no-authority", from, "<source>");
+        addViolation(EXTERNAL_RULE.authority, from, "<source>");
       }
-      const platformImport = specifiers.find(isExternalPlatformImport);
+      const platformImport = specifiers.find(
+        (specifier) =>
+          !isApprovedGeneratedContractImport(specifier) && isExternalPlatformImport(specifier),
+      );
       if (platformImport !== undefined || hasExternalPlatformContract(source)) {
-        addViolation("external-contract-no-platform", from, platformImport ?? "<source>");
+        addViolation(EXTERNAL_RULE.platform, from, platformImport ?? "<source>");
+      }
+      if (hasAutomaticPublication(source)) {
+        addViolation(EXTERNAL_RULE.publication, from, "<source>");
       }
       if (hasExternalDerivation(source)) {
-        addViolation("external-no-automatic-derivation", from, "<source>");
+        addViolation(EXTERNAL_RULE.derivation, from, "<source>");
       }
     }
     if (isExternalBoundarySource(from)) {
       const transportImport = specifiers.find(isExternalTransportImport);
       if (transportImport !== undefined || hasExternalTransportFraming(source)) {
-        addViolation("external-no-transport", from, transportImport ?? "<source>");
+        addViolation(EXTERNAL_RULE.transport, from, transportImport ?? "<source>");
       }
       if (hasExternalGenericBusinessSurface(source)) {
-        addViolation("external-no-generic-business-executor", from, "<source>");
+        addViolation(EXTERNAL_RULE.genericExecutor, from, "<source>");
+      }
+      if (
+        isExternalTrustedEdgeSource(from) &&
+        (hasAutomaticPublication(source) || /\bpublishClient\b/.test(source))
+      ) {
+        addViolation(EXTERNAL_RULE.publication, from, "<source>");
+      }
+      if (
+        isExternalTrustedEdgeSource(from) &&
+        /(?:named-mappings|mapping|handler|missing-final-authorization)/i.test(from) &&
+        !hasFinalAuthorizationEvidence(source)
+      ) {
+        addViolation(EXTERNAL_RULE.finalAuthorization, from, "<source>");
       }
     }
   }
+  if (isExternalBoundarySource(from) && /\.tsp$/.test(from)) {
+    const operations = [...source.matchAll(/\b([A-Za-z][A-Za-z0-9]*)\s*\(/g)].map(
+      (match) => match[1],
+    );
+    const declaredOperations = operations.filter((name) => externalOperationNames.includes(name));
+    const operationSet = new Set(declaredOperations);
+    if (
+      operationSet.size !== externalOperationNames.length ||
+      declaredOperations.length !== externalOperationNames.length
+    ) {
+      addViolation(EXTERNAL_RULE.exactTen, from, `${operationSet.size}/10 operations`);
+    }
+  }
+  if (
+    isExternalBoundarySource(from) &&
+    /(?:semantic-manifest|baseline|generated-contract|semantic-contract\.generated|contract\.md|resource-master-external-contract|stale-metadata)/i.test(
+      from,
+    ) &&
+    (source.includes("externalContractIdentity") ||
+      source.includes("compatibilityRevision") ||
+      source.includes("external-contract")) &&
+    (!source.includes(externalContractIdentity) || !source.includes(externalCompatibilityRevision))
+  ) {
+    addViolation(EXTERNAL_RULE.staleMetadata, from, "<metadata>");
+  }
   if (isExternalCompatibilityFixture(from) && hasExternalPlatformContract(source)) {
-    addViolation("external-contract-no-platform", from, "<source>");
+    addViolation(EXTERNAL_RULE.platform, from, "<source>");
+  }
+  if (
+    isExternalBoundarySource(from) &&
+    /(?:semantic-manifest|baseline|generated-contract|semantic-contract\.generated|contract\.md|resource-master-external-contract|stale-metadata)/i.test(
+      from,
+    ) &&
+    !source.includes(externalContractIdentity)
+  ) {
+    addViolation(EXTERNAL_RULE.staleMetadata, from, "<missing identity>");
   }
 
   if (isPackageManifest) {

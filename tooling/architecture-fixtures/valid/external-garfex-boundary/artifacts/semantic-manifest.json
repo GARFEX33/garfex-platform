@@ -1,0 +1,17 @@
+{
+  "externalContractIdentity": "garfex.resource-master.external-client-contract",
+  "compatibilityRevision": "1",
+  "manifestDigest": "sha256:fixture",
+  "operations": [
+    "getTaxonomy",
+    "getEffectiveResourceSchema",
+    "getValidOptions",
+    "getNaturalUnits",
+    "getResource",
+    "searchResources",
+    "describeResource",
+    "createResource",
+    "updateNonIdentityData",
+    "deactivateResource"
+  ]
+}

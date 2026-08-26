@@ -1,9 +1,17 @@
-import type { ActorContext, ActorId } from "../../resource-master/public.js";
 import type { AuthenticationComposition } from "../../auth/composition.js";
+import type { ActorContext, ActorId, Capability } from "../../resource-master/public.js";
 
 export interface TrustedActorResolver {
   resolveActor(): Promise<ActorContext | null>;
 }
+
+const freshActorContext = (
+  actorId: ActorId,
+  serverCapabilities: ReadonlySet<Capability>,
+): ActorContext => ({
+  actorId,
+  capabilities: new Set(serverCapabilities),
+});
 
 export const createTrustedActorResolver = (
   composition: AuthenticationComposition | null,
@@ -19,6 +27,6 @@ export const createTrustedActorResolver = (
     }
 
     if (actorId === null) return null;
-    return { actorId, capabilities: new Set(composition.capabilities) };
+    return freshActorContext(actorId, composition.capabilities);
   },
 });
