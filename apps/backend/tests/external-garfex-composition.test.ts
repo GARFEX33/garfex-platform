@@ -144,7 +144,14 @@ describe("external GARFEX mutation composition", () => {
       familyCode: "wire",
       typeCode: "solid-wire",
       naturalUnitCode: "meter",
-      attributes: { gauge: { magnitude: "12", unitCode: "awg" } },
+      attributes: [
+        {
+          attributeCode: "gauge",
+          value: { magnitude: "12", unitCode: "awg" },
+          displayValue: "12",
+          identityParticipating: true,
+        },
+      ],
     },
     updateNonIdentityData: {
       resourceId: "resource-1",
@@ -152,7 +159,7 @@ describe("external GARFEX mutation composition", () => {
       naturalUnitCode: "meter",
     },
     deactivateResource: { resourceId: "resource-1", expectedRevision: 3 },
-  } as const;
+  };
 
   it("exposes named mutation handlers that accept trusted actor state", async () => {
     const methods = {
@@ -163,13 +170,13 @@ describe("external GARFEX mutation composition", () => {
 
     await expect(
       handleCreateResource(mutationRequest.createResource, actor, methods),
-    ).resolves.toEqual({ ok: true, value: resource });
+    ).resolves.toEqual({ ok: true, value: { resource } });
     await expect(
       handleUpdateNonIdentityData(mutationRequest.updateNonIdentityData, actor, methods),
-    ).resolves.toEqual({ ok: true, value: resource });
+    ).resolves.toEqual({ ok: true, value: { resource } });
     await expect(
       handleDeactivateResource(mutationRequest.deactivateResource, actor, methods),
-    ).resolves.toEqual({ ok: true, value: resource });
+    ).resolves.toEqual({ ok: true, value: { resource } });
   });
 
   it("composes each mutation with validation before auth and no client authority", async () => {
@@ -189,7 +196,7 @@ describe("external GARFEX mutation composition", () => {
       ok: false,
       error: {
         code: "INVALID_ARGUMENT",
-        fieldIssues: [{ path: "actorId", reason: "UNKNOWN_FIELD" }],
+        fieldIssues: [{ field: "actorId", reason: "UNSUPPORTED" }],
       },
     });
     expect(resolveActor).not.toHaveBeenCalled();
@@ -199,13 +206,13 @@ describe("external GARFEX mutation composition", () => {
         actorResolver: { resolveActor },
         resourceMaster: methods,
       }),
-    ).resolves.toEqual({ ok: true, value: resource });
+    ).resolves.toEqual({ ok: true, value: { resource } });
     await expect(
       composition.invokeExternalDeactivateResource(mutationRequest.deactivateResource, {
         actorResolver: { resolveActor },
         resourceMaster: methods,
       }),
-    ).resolves.toEqual({ ok: true, value: resource });
+    ).resolves.toEqual({ ok: true, value: { resource } });
     expect(resolveActor).toHaveBeenCalledTimes(2);
   });
 });
@@ -224,7 +231,7 @@ describe("external GARFEX read composition", () => {
       ok: false,
       error: {
         code: "INVALID_ARGUMENT",
-        fieldIssues: [{ path: "actorId", reason: "UNKNOWN_FIELD" }],
+        fieldIssues: [{ field: "actorId", reason: "UNSUPPORTED" }],
       },
     });
     expect(resolveActor).not.toHaveBeenCalled();
@@ -270,7 +277,7 @@ describe("external GARFEX read composition", () => {
 
     await expect(handleGetTaxonomy(requests.getTaxonomy, actor, resourceMaster)).resolves.toEqual({
       ok: true,
-      value: taxonomy,
+      value: { items: taxonomy },
     });
     await expect(
       handleGetEffectiveResourceSchema(requests.getEffectiveResourceSchema, actor, resourceMaster),
@@ -279,7 +286,7 @@ describe("external GARFEX read composition", () => {
       handleGetValidOptions(requests.getValidOptions, actor, resourceMaster),
     ).resolves.toEqual({
       ok: true,
-      value: options,
+      value: { options },
     });
     await expect(
       handleGetNaturalUnits(requests.getNaturalUnits, actor, resourceMaster),
@@ -289,7 +296,7 @@ describe("external GARFEX read composition", () => {
     });
     await expect(handleGetResource(requests.getResource, actor, resourceMaster)).resolves.toEqual({
       ok: true,
-      value: resource,
+      value: { resource },
     });
     await expect(
       handleSearchResources(requests.searchResources, actor, resourceMaster),
@@ -369,7 +376,7 @@ describe("external GARFEX read composition", () => {
       ok: false,
       error: {
         code: "INVALID_ARGUMENT",
-        fieldIssues: [{ path: "operation", reason: "INVALID_VALUE" }],
+        fieldIssues: [{ field: "operation", reason: "UNSUPPORTED" }],
       },
     });
     expect(

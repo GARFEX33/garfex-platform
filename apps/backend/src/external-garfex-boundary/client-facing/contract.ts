@@ -94,11 +94,11 @@ type GeneratedProperties<
   Properties extends readonly GeneratedProperty[],
   Depth extends number = GeneratedTypeDepth,
 > = {
-  readonly [Property in Properties[number] as Property["optional"] extends false
+  [Property in Properties[number] as Property["optional"] extends false
     ? Property["name"]
     : never]: GeneratedValue<Property["type"], Depth>;
 } & {
-  readonly [Property in Properties[number] as Property["optional"] extends true
+  [Property in Properties[number] as Property["optional"] extends true
     ? Property["name"]
     : never]?: GeneratedValue<Property["type"], Depth>;
 };
@@ -137,7 +137,7 @@ type GeneratedValue<
         readonly kind: "array";
         readonly element: infer Element extends GeneratedSemanticType;
       }
-    ? readonly GeneratedValue<Element, PreviousGeneratedDepth<Depth>>[]
+    ? GeneratedValue<Element, PreviousGeneratedDepth<Depth>>[]
     : Definition extends { readonly kind: "literal"; readonly value: infer Value }
       ? Value
       : Definition extends {
@@ -258,40 +258,14 @@ export type GeneratedExternalSuccess<Operation extends ExternalOperation> = Gene
   OperationSuccessName<Operation>
 >;
 
-type GeneratedCreateResourceRequest = GeneratedExternalRequest<"createResource">;
-type ArrayPropertyName<Model> = {
-  [Property in keyof Model]: Model[Property] extends readonly unknown[] ? Property : never;
-}[keyof Model];
-type ReplacedProperty<Model, Property extends keyof Model, Value> = Omit<Model, Property> & {
-  readonly [Key in Property]: Value;
-};
-type CompatibilityCreateResourceRequest = ReplacedProperty<
-  GeneratedCreateResourceRequest,
-  ArrayPropertyName<GeneratedCreateResourceRequest>,
-  Readonly<Record<string, GeneratedNamed<"AttributeValue">>>
->;
-
-type CompatibilityRequest<Operation extends ExternalOperation> = Operation extends "createResource"
-  ? CompatibilityCreateResourceRequest
-  : GeneratedExternalRequest<Operation>;
-
 export type ExternalRequests = {
-  readonly [Operation in ExternalOperation]: CompatibilityRequest<Operation>;
+  readonly [Operation in ExternalOperation]: GeneratedExternalRequest<Operation>;
 };
 
 export type ExternalRequest<Operation extends ExternalOperation> = ExternalRequests[Operation];
 
 export type ExternalSuccesses = {
-  readonly getTaxonomy: ExternalTaxonomy[];
-  readonly getEffectiveResourceSchema: ExternalEffectiveResourceSchema;
-  readonly getValidOptions: ExternalValidOptions;
-  readonly getNaturalUnits: ExternalNaturalUnits;
-  readonly getResource: ExternalResource;
-  readonly searchResources: ExternalSearchResourcesResult;
-  readonly describeResource: ExternalResourceDescription;
-  readonly createResource: ExternalResource;
-  readonly updateNonIdentityData: ExternalResource;
-  readonly deactivateResource: ExternalResource;
+  readonly [Operation in ExternalOperation]: GeneratedExternalSuccess<Operation>;
 };
 
 export type ExternalSuccess<Operation extends ExternalOperation> = ExternalSuccesses[Operation];
@@ -329,49 +303,36 @@ export type ExternalResourceSummary = GeneratedExternalResourceSummary;
 export type ExternalSearchResourcesResult = GeneratedNamed<"SearchResourcesSuccess">;
 export type ExternalResourceDescription = GeneratedNamed<"DescribeResourceSuccess">;
 
-export type ExternalFieldIssue =
-  | GeneratedNamed<"FieldIssue">
-  | {
-      readonly path: string;
-      readonly reason: ExternalFieldIssueReason;
-    };
+export type ExternalFieldIssueReasonCanonical =
+  | "CONFLICTING"
+  | "INVALID_FORMAT"
+  | "OUT_OF_RANGE"
+  | "REQUIRED"
+  | "UNSUPPORTED";
+export type ExternalFieldIssue = {
+  field: string;
+  reason: ExternalFieldIssueReasonCanonical;
+};
 
-type UpperSnakeCase<
+type _UpperSnakeCase<
   Value extends string,
   First extends boolean = true,
 > = Value extends `${infer Head}${infer Tail}`
-  ? `${First extends true ? "" : Head extends Lowercase<Head> ? "" : "_"}${Uppercase<Head>}${UpperSnakeCase<Tail, false>}`
+  ? `${First extends true ? "" : Head extends Lowercase<Head> ? "" : "_"}${Uppercase<Head>}${_UpperSnakeCase<Tail, false>}`
   : "";
 
-type GeneratedFailureVariant = ManifestUnionByName<"SafeFailure">["variants"][number];
-type GeneratedFailureCode<Model extends string> =
-  Extract<UpperSnakeCase<Model>, ExternalErrorCode> extends never
-    ? Model extends `${infer Prefix}Failure`
-      ? Extract<UpperSnakeCase<Prefix>, ExternalErrorCode>
-      : never
-    : Extract<UpperSnakeCase<Model>, ExternalErrorCode>;
-type GeneratedFailureValue<Variant extends GeneratedFailureVariant> = Variant extends {
-  readonly type: {
-    readonly kind: "named";
-    readonly name: infer Name extends string;
-  };
-}
-  ? GeneratedNamed<Name> extends infer Value
-    ? Value extends { readonly code: ExternalErrorCode }
-      ? Omit<Value, "code"> & {
-          readonly code: GeneratedFailureCode<Name>;
-        }
-      : never
-    : never
-  : never;
-type GeneratedExternalError = GeneratedFailureValue<GeneratedFailureVariant>;
-type CompatibilityExternalError<Value> = Value extends object
-  ? "fieldIssues" extends keyof Value
-    ? Omit<Value, "fieldIssues"> & { readonly fieldIssues?: readonly ExternalFieldIssue[] }
-    : Value
-  : never;
-
-export type ExternalError = CompatibilityExternalError<GeneratedExternalError>;
+export type ExternalError =
+  | { readonly code: "UNAUTHENTICATED" }
+  | { readonly code: "FORBIDDEN" }
+  | { readonly code: "INVALID_ARGUMENT"; fieldIssues?: ExternalFieldIssue[] }
+  | { readonly code: "INVALID_REFERENCE"; fieldIssues?: ExternalFieldIssue[] }
+  | { readonly code: "VALIDATION_FAILED"; fieldIssues?: ExternalFieldIssue[] }
+  | { readonly code: "NOT_FOUND" }
+  | { readonly code: "DUPLICATE"; readonly existingResourceId?: string }
+  | { readonly code: "CONFLICT"; readonly currentRevision?: number }
+  | { readonly code: "INVALID_LIFECYCLE" }
+  | { readonly code: "CATALOG_UNAVAILABLE" }
+  | { readonly code: "INTERNAL_FAILURE" };
 
 export type ExternalFailure = {
   readonly ok: false;

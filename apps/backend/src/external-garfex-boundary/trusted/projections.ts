@@ -3,7 +3,11 @@ import type {
   ResourceMaster,
   ResourceView,
 } from "../../resource-master/public.js";
-import type { ExternalAttributeValue, ExternalSuccess } from "../client-facing/contract.js";
+import type {
+  ExternalAttributeValue,
+  ExternalResource,
+  ExternalSuccess,
+} from "../client-facing/contract.js";
 
 type SuccessValue<Result> =
   Extract<Awaited<Result>, { readonly ok: true }> extends {
@@ -19,15 +23,17 @@ type SearchSuccess = SuccessValue<ReturnType<ResourceMaster["searchResources"]>>
 type DescriptionSuccess = SuccessValue<ReturnType<ResourceMaster["describeResource"]>>;
 
 export function projectExternalGetTaxonomy(value: TaxonomySuccess): ExternalSuccess<"getTaxonomy"> {
-  return value.map((entry) => ({
-    code: entry.code,
-    name: entry.name,
-    families: entry.families.map((family) => ({
-      code: family.code,
-      name: family.name,
-      types: family.types.map((type) => ({ code: type.code, name: type.name })),
+  return {
+    items: value.map((entry) => ({
+      code: entry.code,
+      name: entry.name,
+      families: entry.families.map((family) => ({
+        code: family.code,
+        name: family.name,
+        types: family.types.map((type) => ({ code: type.code, name: type.name })),
+      })),
     })),
-  }));
+  };
 }
 
 function projectSchemaResult(result: EffectiveAttributeView["defaultResult"]) {
@@ -57,8 +63,9 @@ export function projectExternalGetEffectiveResourceSchema(
 
 export const projectExternalGetValidOptions = (
   value: OptionsSuccess,
-): ExternalSuccess<"getValidOptions"> =>
-  value.map((option) => ({ code: option.code, label: option.label }));
+): ExternalSuccess<"getValidOptions"> => ({
+  options: value.map((option) => ({ code: option.code, label: option.label })),
+});
 
 export const projectExternalGetNaturalUnits = (
   value: UnitsSuccess,
@@ -74,7 +81,7 @@ function projectAttributeValue(
   return { magnitude: value.magnitude, unitCode: value.unitCode };
 }
 
-function projectResource(value: ResourceView): ExternalSuccess<"getResource"> {
+function projectResource(value: ResourceView): ExternalResource {
   return {
     resourceId: value.resourceId,
     classCode: value.classCode,
@@ -94,8 +101,11 @@ function projectResource(value: ResourceView): ExternalSuccess<"getResource"> {
   };
 }
 
-export const projectExternalGetResource = (value: ResourceView): ExternalSuccess<"getResource"> =>
-  projectResource(value);
+export const projectExternalGetResource = (
+  value: ResourceView,
+): ExternalSuccess<"getResource"> => ({
+  resource: projectResource(value),
+});
 
 export function projectExternalSearchResources(
   value: SearchSuccess,
@@ -128,12 +138,12 @@ export const projectExternalDescribeResource = (
 
 export const projectExternalCreateResource = (
   value: ResourceView,
-): ExternalSuccess<"createResource"> => projectResource(value);
+): ExternalSuccess<"createResource"> => ({ resource: projectResource(value) });
 
 export const projectExternalUpdateNonIdentityData = (
   value: ResourceView,
-): ExternalSuccess<"updateNonIdentityData"> => projectResource(value);
+): ExternalSuccess<"updateNonIdentityData"> => ({ resource: projectResource(value) });
 
 export const projectExternalDeactivateResource = (
   value: ResourceView,
-): ExternalSuccess<"deactivateResource"> => projectResource(value);
+): ExternalSuccess<"deactivateResource"> => ({ resource: projectResource(value) });

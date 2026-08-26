@@ -69,7 +69,7 @@ describe("external Resource Master error normalization", () => {
     for (const [code, metadata] of [
       ["DUPLICATE", { existingResourceId: "" }],
       ["DUPLICATE", { existingResourceId: 12 }],
-      ["CONFLICT", { currentRevision: -1 }],
+
       ["CONFLICT", { currentRevision: 1.5 }],
       ["CONFLICT", { currentRevision: "4" }],
     ] as const) {

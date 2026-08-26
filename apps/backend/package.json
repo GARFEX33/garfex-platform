@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "check": "vitest run && tsc --noEmit"
+    "check": "vitest run && tsc --noEmit",
+    "smoke:native": "vitest run tests/smoke/resource-master-native-client.entry.test.ts"
   },
   "dependencies": {
     "convex": "1.45.0"

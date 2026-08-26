@@ -1,0 +1,190 @@
+{
+  "evidenceKind": "real-generated-client-smoke",
+  "evidenceStatus": "complete",
+  "matrixVersion": "JD-S-002/closed-v2",
+  "targetKind": "local-anonymous",
+  "redactedTarget": "http://127.0.0.1",
+  "smokeIdentity": {
+    "runId": 60149044,
+    "gauge": "60149044"
+  },
+  "convexVersion": "1.45.0",
+  "manifestDigest": "sha256:32a4d0ea37e9441763d49971c8075d21fa07cc36b0ea69446613098a12b83f53",
+  "generatedValidatorDigest": "sha256:f4e7058877f1414be3414bb4b704c6be16bc15995f434260103e49a2f82254c7",
+  "generatedClientDigest": "sha256:571417cabfff8bd9cee544435ae0b5d026085e8d489efd6daf6c866477da33f0",
+  "catalogRevision": 1,
+  "bootstrapCommand": "corepack pnpm --filter @garfex/backend exec convex run resourceCatalogBootstrap:installCableCatalogV1 '{\"expectedRevision\":0}' --deployment anonymous:anonymous-agent",
+  "commandExitStatus": 0,
+  "cases": [
+    {
+      "id": "missing-resource-id",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "missing-nested-field",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "unknown-request-field",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "unknown-nested-field",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "wrong-primitive",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "wrong-object-shape",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "wrong-array-shape",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "wrong-null-shape",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "legacy-attribute-map",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "invalid-lifecycle-literal",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "unsupported-int64",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "unsupported-bytes",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "nonserializable-function",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "nonserializable-symbol",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "nonserializable-cycle",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "nonserializable-undefined",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "nonserializable-class",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "empty-resource-id",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "control-constrained-string",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "empty-cursor",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "fractional-number",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "non-finite-number",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "unsafe-number",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "out-of-int32-number",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "search-limit-zero",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "search-limit-over-upper-bound",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "repeated-attribute-code",
+      "category": "canonical-invalid",
+      "observed": "canonical-invalid"
+    },
+    {
+      "id": "search-limit-one",
+      "category": "accepted",
+      "observed": "accepted"
+    },
+    {
+      "id": "search-limit-fifty",
+      "category": "accepted",
+      "observed": "accepted"
+    },
+    {
+      "id": "negative-signed-revision",
+      "category": "accepted",
+      "observed": "accepted"
+    },
+    {
+      "id": "empty-attribute-array",
+      "category": "accepted",
+      "observed": "accepted"
+    },
+    {
+      "id": "forged-top-level-authority",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "forged-nested-authority",
+      "category": "transport-rejection",
+      "observed": "transport-rejection"
+    },
+    {
+      "id": "ordinary-authority-like-text",
+      "category": "accepted",
+      "observed": "accepted"
+    }
+  ]
+}

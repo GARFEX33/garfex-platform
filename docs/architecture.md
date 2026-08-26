@@ -167,7 +167,7 @@ TypeSpec is the GARFEX-owned external semantic authority at [`contracts/external
 
 The external surface is exactly `getTaxonomy`, `getEffectiveResourceSchema`, `getValidOptions`, `getNaturalUnits`, `getResource`, `searchResources`, `describeResource`, `createResource`, `updateNonIdentityData`, and `deactivateResource`. Each maps one-to-one to the identically named Resource Master operation: the first seven require `resource:read`, followed by `resource:create`, `resource:update-non-identity`, and `resource:deactivate`. The safe failure codes are `UNAUTHENTICATED`, `FORBIDDEN`, `INVALID_ARGUMENT`, `INVALID_REFERENCE`, `VALIDATION_FAILED`, `NOT_FOUND`, `DUPLICATE`, `CONFLICT`, `INVALID_LIFECYCLE`, `CATALOG_UNAVAILABLE`, and `INTERNAL_FAILURE`; only applicable `fieldIssues`, `existingResourceId`, and `currentRevision` metadata are public.
 
-The three boundaries remain separate: TypeSpec owns client-safe semantics; the trusted edge validates, authenticates, constructs a fresh actor, maps named operations, projects fields, and normalizes safe errors; Resource Master owns the actor-first application contract and final deny-by-default authorization. Convex remains private infrastructure behind application-owned ports. Revision `1` is opaque and compared exactly. These records preserve open transport, HTTP/wire authentication, OpenAPI, Scalar, Orval, SDK/publication, productive identity, UI, and version-policy decisions.
+The four layers remain separate: TypeSpec owns client-safe semantics; the trusted edge validates, authenticates, constructs a fresh actor, maps named operations, projects fields, and normalizes safe errors; Resource Master owns the actor-first contract and final deny-by-default authorization; native Convex is a downstream adapter for GARFEX-owned local/development clients only. Revision `1` is opaque and compared exactly. HTTP, OpenAPI, Scalar, Orval, SDK/publication, productive identity, UI, and version-policy decisions remain unselected.
 
 Related records: [GARFEX boundary](./external-garfex-boundary.md), [external client boundary](./external-client-boundary.md), and [authentication boundary](./auth-boundary.md).
 
@@ -192,8 +192,8 @@ src/modules/<module>/
 5. Add the owning app/package to the TypeScript reference graph when it produces build output.
 6. Add behavior and architecture coverage, then run `pnpm check`.
 
-Temporal workflows, agent harnesses, additional transports, and other persistence technologies are
-not implemented. When introduced, they remain edge adapters and follow the same backend module
+Temporal workflows, agent harnesses, HTTP or additional transports, and other persistence technologies are
+not implemented. The accepted native adapter remains scoped to local/development clients. When introduced, they remain edge adapters and follow the same backend module
 contract and ownership rules rather than becoming dependencies of core code. An external client still
 requires a distinct client-facing boundary; “GARFEX client” does not imply a shared package or SDK.
 Provider-neutral actor contracts,

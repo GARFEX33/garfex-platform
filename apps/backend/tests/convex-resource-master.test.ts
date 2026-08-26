@@ -23,6 +23,22 @@ const valid = {
   familyCode: "CONDUCTORES",
   typeCode: "CABLE",
   naturalUnitCode: "M",
+  attributes: [
+    {
+      attributeCode: "conductor_material",
+      value: "COBRE",
+      displayValue: "COBRE",
+      identityParticipating: true,
+    },
+    { attributeCode: "gauge", value: "12", displayValue: "12", identityParticipating: true },
+    { attributeCode: "insulation", value: "THW", displayValue: "THW", identityParticipating: true },
+    { attributeCode: "color", value: "ROJO", displayValue: "ROJO", identityParticipating: false },
+    { attributeCode: "voltage", value: "600V", displayValue: "600V", identityParticipating: false },
+  ],
+};
+
+const moduleValid = {
+  ...valid,
   attributes: {
     conductor_material: "COBRE",
     gauge: "12",
@@ -41,9 +57,9 @@ const seededTest = async () => {
 };
 
 const messages = {
-  RESOURCE_CATALOG_UNAVAILABLE: "resource catalog is unavailable",
-  RESOURCE_CATALOG_UNINITIALIZED: "resource catalog is uninitialized",
-  RESOURCE_CATALOG_INVALID: "resource catalog is invalid",
+  RESOURCE_CATALOG_UNAVAILABLE: "CATALOG_UNAVAILABLE",
+  RESOURCE_CATALOG_UNINITIALIZED: "CATALOG_UNAVAILABLE",
+  RESOURCE_CATALOG_INVALID: "CATALOG_UNAVAILABLE",
 } as const;
 
 const catalogOperations = (t: Awaited<ReturnType<typeof seededTest>>) =>
@@ -101,11 +117,12 @@ const catalogOperations = (t: Awaited<ReturnType<typeof seededTest>>) =>
 const expectCatalogFailure = async (
   t: Awaited<ReturnType<typeof seededTest>>,
   code: keyof typeof messages,
+  expectedCode: string = messages[code],
 ) => {
   for (const operation of catalogOperations(t)) {
     expect(await operation.invoke(), operation.name).toEqual({
       ok: false,
-      error: { code, message: messages[code] },
+      error: { code: expectedCode },
     });
   }
 };
@@ -129,7 +146,7 @@ describe("Convex Resource Master adapter", () => {
         const t = convexTest(schema, modules);
         expect(await t.query(api.resourceMaster.getTaxonomy, {})).toEqual({
           ok: false,
-          error: { code: "UNAUTHENTICATED", message: "authentication is required" },
+          error: { code: "UNAUTHENTICATED" },
         });
       } finally {
         if (configuredRuntimeEnvironment === undefined) delete process.env.GARFEX_RUNTIME_ENV;
@@ -159,7 +176,7 @@ describe("Convex Resource Master adapter", () => {
     const t = await seededTest();
     expect(await t.query(api.resourceMaster.getTaxonomy, {})).toMatchObject({
       ok: true,
-      value: [{ code: "MATERIAL", families: [{ code: "CONDUCTORES" }] }],
+      value: { items: [{ code: "MATERIAL", families: [{ code: "CONDUCTORES" }] }] },
     });
     expect(
       await t.query(api.resourceMaster.getEffectiveResourceSchema, {
@@ -175,7 +192,7 @@ describe("Convex Resource Master adapter", () => {
       await t.query(api.resourceMaster.getValidOptions, { attributeCode: "insulation" }),
     ).toMatchObject({
       ok: true,
-      value: expect.arrayContaining([expect.objectContaining({ code: "THW" })]),
+      value: { options: expect.arrayContaining([expect.objectContaining({ code: "THW" })]) },
     });
     expect(
       await t.query(api.resourceMaster.getNaturalUnits, { familyCode: "CONDUCTORES" }),
@@ -200,7 +217,7 @@ describe("Convex Resource Master adapter", () => {
     });
     expect(await t.query(api.resourceMaster.getTaxonomy, {})).toMatchObject({
       ok: true,
-      value: [{ families: [{ name: "Persisted" }] }],
+      value: { items: [{ families: [{ name: "Persisted" }] }] },
     });
     expect(await t.mutation(api.resourceMaster.createResource, valid)).toMatchObject({ ok: true });
   });
@@ -227,7 +244,7 @@ describe("Convex Resource Master adapter", () => {
         },
       } as never),
     );
-    await expectCatalogFailure(empty, "RESOURCE_CATALOG_UNINITIALIZED");
+    await expectCatalogFailure(empty, "RESOURCE_CATALOG_UNINITIALIZED", "CATALOG_UNAVAILABLE");
 
     const invalid = convexTest(schema, modules);
     await invalid.run((ctx) =>
@@ -240,7 +257,7 @@ describe("Convex Resource Master adapter", () => {
         },
       } as never),
     );
-    await expectCatalogFailure(invalid, "RESOURCE_CATALOG_INVALID");
+    await expectCatalogFailure(invalid, "RESOURCE_CATALOG_INVALID", "INTERNAL_FAILURE");
   });
 
   it("maps Convex reader unavailability for every composed entrypoint", async () => {
@@ -259,7 +276,12 @@ describe("Convex Resource Master adapter", () => {
       { name: "getTaxonomy", invoke: () => queryMaster.getTaxonomy() },
       {
         name: "getEffectiveResourceSchema",
-        invoke: () => queryMaster.getEffectiveResourceSchema(valid),
+        invoke: () =>
+          queryMaster.getEffectiveResourceSchema({
+            classCode: valid.classCode,
+            familyCode: valid.familyCode,
+            typeCode: valid.typeCode,
+          }),
       },
       {
         name: "getValidOptions",
@@ -269,7 +291,7 @@ describe("Convex Resource Master adapter", () => {
         name: "getNaturalUnits",
         invoke: () => queryMaster.getNaturalUnits({ familyCode: "CONDUCTORES" }),
       },
-      { name: "createResource", invoke: () => mutationMaster.createResource(valid) },
+      { name: "createResource", invoke: () => mutationMaster.createResource(moduleValid) },
       {
         name: "updateNonIdentityData",
         invoke: () =>
@@ -299,7 +321,7 @@ describe("Convex Resource Master adapter", () => {
         ok: false,
         error: {
           code: "RESOURCE_CATALOG_UNAVAILABLE",
-          message: messages.RESOURCE_CATALOG_UNAVAILABLE,
+          message: "resource catalog is unavailable",
         },
       });
     }
@@ -325,12 +347,16 @@ describe("Convex Resource Master adapter", () => {
       ),
     ).toMatchObject({ kind: "INSTALLED", snapshot: { revision: 2 } });
     expect(
-      await t.query(api.resourceMaster.getResource, { resourceId: created.value.resourceId }),
+      await t.query(api.resourceMaster.getResource, {
+        resourceId: created.value.resource.resourceId,
+      }),
     ).toMatchObject({
       ok: true,
       value: {
-        resourceId: created.value.resourceId,
-        canonicalIdentity: created.value.canonicalIdentity,
+        resource: {
+          resourceId: created.value.resource.resourceId,
+          canonicalIdentity: created.value.resource.canonicalIdentity,
+        },
       },
     });
     expect(
@@ -340,7 +366,7 @@ describe("Convex Resource Master adapter", () => {
       value: {
         items: [
           expect.objectContaining({
-            resourceId: created.value.resourceId,
+            resourceId: created.value.resource.resourceId,
             familyName: "Conductores v2",
             values: expect.arrayContaining(["12"]),
           }),
@@ -352,10 +378,12 @@ describe("Convex Resource Master adapter", () => {
   it("persists header and attributes atomically and rejects indexed duplicates", async () => {
     const t = await seededTest();
     const created = await t.mutation(api.resourceMaster.createResource, valid);
-    expect(created).toMatchObject({ ok: true, value: { revision: 1 } });
+    expect(created).toMatchObject({ ok: true, value: { resource: { revision: 1 } } });
     const duplicate = await t.mutation(api.resourceMaster.createResource, {
       ...valid,
-      attributes: { ...valid.attributes, gauge: "+12" },
+      attributes: valid.attributes.map((attribute) =>
+        attribute.attributeCode === "gauge" ? { ...attribute, value: "+12" } : attribute,
+      ),
     });
     expect(duplicate).toMatchObject({ ok: false, error: { code: "DUPLICATE" } });
     const counts = await t.run(async (ctx) => ({
@@ -370,16 +398,22 @@ describe("Convex Resource Master adapter", () => {
     const created = await t.mutation(api.resourceMaster.createResource, valid);
     if (!created.ok) throw new Error("expected create success");
     expect(
-      await t.query(api.resourceMaster.getResource, { resourceId: created.value.resourceId }),
-    ).toEqual(created);
+      await t.query(api.resourceMaster.getResource, {
+        resourceId: created.value.resource.resourceId,
+      }),
+    ).toEqual({ ok: true, value: { resource: created.value.resource } });
     expect(
-      await t.query(api.resourceMaster.describeResource, { resourceId: created.value.resourceId }),
+      await t.query(api.resourceMaster.describeResource, {
+        resourceId: created.value.resource.resourceId,
+      }),
     ).toMatchObject({ ok: true, value: { description: expect.stringContaining("THW") } });
     expect(
       await t.query(api.resourceMaster.searchResources, { terms: "cab cobre", limit: 10 }),
     ).toMatchObject({
       ok: true,
-      value: { items: [expect.objectContaining({ resourceId: created.value.resourceId })] },
+      value: {
+        items: [expect.objectContaining({ resourceId: created.value.resource.resourceId })],
+      },
     });
   });
 
@@ -404,28 +438,31 @@ describe("Convex Resource Master adapter", () => {
 
     expect(
       await t.mutation(api.resourceMaster.updateNonIdentityData, {
-        resourceId: created.value.resourceId,
+        resourceId: created.value.resource.resourceId,
         expectedRevision: 0,
         naturalUnitCode: "M",
       }),
     ).toMatchObject({ ok: false, error: { code: "CONFLICT", currentRevision: 1 } });
     const updated = await t.mutation(api.resourceMaster.updateNonIdentityData, {
-      resourceId: created.value.resourceId,
+      resourceId: created.value.resource.resourceId,
       expectedRevision: 1,
       naturalUnitCode: "ROLLO",
     });
     expect(updated).toMatchObject({
       ok: true,
-      value: { naturalUnitCode: "ROLLO", revision: 2, active: true },
+      value: { resource: { naturalUnitCode: "ROLLO", revision: 2, active: true } },
     });
     const deactivated = await t.mutation(api.resourceMaster.deactivateResource, {
-      resourceId: created.value.resourceId,
+      resourceId: created.value.resource.resourceId,
       expectedRevision: 2,
     });
-    expect(deactivated).toMatchObject({ ok: true, value: { active: false, revision: 3 } });
+    expect(deactivated).toMatchObject({
+      ok: true,
+      value: { resource: { active: false, revision: 3 } },
+    });
     expect(
       await t.mutation(api.resourceMaster.updateNonIdentityData, {
-        resourceId: created.value.resourceId,
+        resourceId: created.value.resource.resourceId,
         expectedRevision: 3,
         naturalUnitCode: "M",
       }),
@@ -434,24 +471,30 @@ describe("Convex Resource Master adapter", () => {
     const persisted = await t.run(async (ctx) => {
       const header = await ctx.db
         .query("resources")
-        .withIndex("by_resource_id", (query) => query.eq("resourceId", created.value.resourceId))
+        .withIndex("by_resource_id", (query) =>
+          query.eq("resourceId", created.value.resource.resourceId),
+        )
         .unique();
       const attributes = await ctx.db
         .query("resourceAttributes")
-        .withIndex("by_resource_code", (query) => query.eq("resourceId", created.value.resourceId))
+        .withIndex("by_resource_code", (query) =>
+          query.eq("resourceId", created.value.resource.resourceId),
+        )
         .collect();
       return { header, attributes };
     });
     expect(persisted.header).toMatchObject({
-      resourceId: created.value.resourceId,
-      canonicalIdentity: created.value.canonicalIdentity,
+      resourceId: created.value.resource.resourceId,
+      canonicalIdentity: created.value.resource.canonicalIdentity,
       naturalUnitCode: "ROLLO",
       active: false,
       revision: 3,
     });
-    expect(persisted.attributes).toHaveLength(created.value.attributes.length);
+    expect(persisted.attributes).toHaveLength(created.value.resource.attributes.length);
     expect(
-      await t.query(api.resourceMaster.getResource, { resourceId: created.value.resourceId }),
+      await t.query(api.resourceMaster.getResource, {
+        resourceId: created.value.resource.resourceId,
+      }),
     ).toEqual(deactivated);
     expect(
       await t.query(api.resourceMaster.searchResources, {
@@ -461,7 +504,9 @@ describe("Convex Resource Master adapter", () => {
       }),
     ).toMatchObject({
       ok: true,
-      value: { items: [expect.objectContaining({ resourceId: created.value.resourceId })] },
+      value: {
+        items: [expect.objectContaining({ resourceId: created.value.resource.resourceId })],
+      },
     });
   });
 
